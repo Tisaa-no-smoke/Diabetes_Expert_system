@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Bell, ChevronDown, ChevronRight, Languages, LogOut, Menu, Moon, PanelLeft, Plus, Settings, Sun, UserRound } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Bell, ChevronDown, ChevronRight, LogOut, Menu, Moon, PanelLeft, Settings, Sun, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HeaderClock } from './HeaderClock'
 import { NotificationDropdown } from './NotificationDropdown'
@@ -22,7 +22,6 @@ export function Topbar({
   const { language, setLanguage, t } = useLanguage()
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
-  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -44,22 +43,12 @@ export function Topbar({
 
   const activeRole = user?.roles?.[0] || user?.role || 'user'
   const isDark = theme === 'dark'
-  const nextLanguage = language === 'en' ? 'km' : 'en'
   const initials = (user?.name || 'U')
     .split(' ')
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
-
-  const hideNewAssessmentPaths = ['/', '/users', '/rules', '/roles-permissions']
-  const shouldShowNewAssessment = !(
-    hideNewAssessmentPaths.includes(location.pathname) ||
-    location.pathname.startsWith('/users/') ||
-    // Also consider patient specific user dashboard if any. But standard user dashboard is '/'.
-    // If user dashboard means patient landing page.
-    (user?.role === 'user' && location.pathname === '/')
-  )
 
   return (
     <header
@@ -111,38 +100,51 @@ export function Topbar({
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 xl:gap-3">
-          {shouldShowNewAssessment && (
-            <button
-              type="button"
-              onClick={() => {
-                navigate('/diagnosis', {
-                  state: {
-                    requestRestart: true,
-                    restartRequestId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  },
-                })
-              }}
-              className="hidden min-h-10 items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-700 sm:inline-flex"
-            >
-              <Plus className="h-4 w-4" />
-              {t('topbar.newAssessment')}
-            </button>
-          )}
-
           <HeaderClock theme={theme} language={language} />
 
           <div className="hidden h-7 w-px bg-slate-200 dark:bg-[#1e2234] sm:block" />
 
-          <button
-            type="button"
-            onClick={() => setLanguage(nextLanguage)}
-            className="hidden min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-primary-50 hover:text-primary-700 dark:border-[#1e2234] dark:bg-[#101020] dark:text-slate-300 dark:hover:bg-[#181830] dark:hover:text-primary-300 sm:inline-flex"
+          <div
+            role="group"
             aria-label={t('topbar.languageSwitcher')}
-            title={t('topbar.languageSwitcher')}
+            className="hidden h-11 w-40 shrink-0 rounded-full border border-slate-200 bg-slate-100/80 p-1 shadow-[inset_0_1px_3px_rgba(15,23,42,0.06)] dark:border-[#292940] dark:bg-[#0b0b18] sm:block"
           >
-            <Languages className="h-4 w-4" />
-            <span>{language === 'en' ? 'EN' : 'ខ្មែរ'}</span>
-          </button>
+            <div className="relative grid h-full grid-cols-2">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'pointer-events-none absolute inset-y-0 left-0 w-1/2 rounded-full border border-primary-200/70 bg-white shadow-[0_2px_6px_rgba(15,23,42,0.12)] transition-transform duration-300 ease-out motion-reduce:transition-none dark:border-primary-400/35 dark:bg-[#25253b]',
+                  language === 'km' && 'translate-x-full'
+                )}
+              />
+            {[
+              { code: 'en', flag: '🇺🇸', shortLabel: 'EN', label: t('common.english', 'English') },
+              { code: 'km', flag: '🇰🇭', shortLabel: 'KM', label: t('common.khmer', 'Khmer') },
+            ].map((option) => {
+              const isActive = language === option.code
+
+              return (
+                <button
+                  key={option.code}
+                  type="button"
+                  onClick={() => setLanguage(option.code)}
+                  className={cn(
+                    'group relative inline-flex h-full w-full items-center justify-center gap-1.5 rounded-full px-2 transition-colors duration-200 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 motion-reduce:transition-none dark:focus-visible:ring-offset-[#0b0b18]',
+                    isActive
+                      ? 'text-primary-800 dark:text-primary-200'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  )}
+                  aria-label={option.label}
+                  aria-pressed={isActive}
+                  title={option.label}
+                >
+                  <span aria-hidden="true" className="inline-flex h-6 w-7 items-center justify-center text-[22px] leading-none transition-transform duration-200 group-hover:scale-110 motion-reduce:transform-none motion-reduce:transition-none">{option.flag}</span>
+                  <span aria-hidden="true" className="text-[11px] font-bold leading-none">{option.shortLabel}</span>
+                </button>
+              )
+            })}
+            </div>
+          </div>
 
           <button
             type="button"
