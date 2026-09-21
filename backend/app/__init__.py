@@ -131,6 +131,35 @@ def _ensure_fact_columns():
         logging.getLogger(__name__).warning("Could not auto-add fact columns: %s", e)
 
 
+def _ensure_patient_profile_columns():
+    """Bring older SQLite patient tables up to date without replacing data."""
+    try:
+        inspector = inspect(db.engine)
+        if "patients" not in inspector.get_table_names():
+            return
+
+        existing_cols = {col["name"] for col in inspector.get_columns("patients")}
+        columns_to_add = [
+            ("height_cm", "FLOAT"),
+            ("weight_kg", "FLOAT"),
+            ("waist_circumference", "FLOAT"),
+            ("smoking", "BOOLEAN"),
+            ("sedentary_lifestyle", "BOOLEAN"),
+            ("family_history", "BOOLEAN"),
+            ("hypertension", "BOOLEAN"),
+            ("high_cholesterol", "BOOLEAN"),
+            ("profile_completed_at", "DATETIME"),
+        ]
+
+        with db.engine.connect() as conn:
+            for col_name, col_type in columns_to_add:
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE patients ADD COLUMN {col_name} {col_type}"))
+            conn.commit()
+    except Exception as e:
+        logging.getLogger(__name__).warning("Could not auto-add patient profile columns: %s", e)
+
+
 def create_app(config_object=Config):
     app = Flask(__name__)
     app.config.from_object(config_object)
@@ -163,6 +192,7 @@ def create_app(config_object=Config):
 
         _ensure_user_profile_columns()
         _ensure_fact_columns()
+        _ensure_patient_profile_columns()
 
         if app.config.get("SEED_DEMO_DATA", True):
             # Only run automatic seed if database has not been seeded yet
