@@ -21,7 +21,7 @@
   },
   "Possible diabetic ketoacidosis detected. Go to emergency care immediately. Do NOT delay. Blood ketone measurement, arterial blood gas, and IV fluids are likely needed.": {
     "en": "Signs of diabetic ketoacidosis (DKA) — a medical emergency. Go to emergency care now; do not wait for test results.",
-    "km": "សញ្ញានៃ DKA (គីតូអាស៊ីត) — អាសន្នវេជ្ជសាស្ត្រ។ ទៅជំពូកសង្គ្រោះបន្ទាន់ឥឡូវនេះ។ កុំរង់ចាំលទ្ធផលតេស្ត។"
+    "km": "សញ្ញានៃវិបត្តិអាស៊ីតកើនឡើងក្នុងឈាម (DKA) — ជាស្ថានភាពអាសន្នវេជ្ជសាស្ត្រ។ សូមទៅកាន់ផ្នែកសង្គ្រោះបន្ទាន់ឥឡូវនេះ ដោយកុំរង់ចាំលទ្ធផលតេស្តឡើយ។"
   },
   "Treat hypoglycemia with the 15/15 rule: take 15 g of fast-acting carbohydrate, wait 15 minutes, recheck glucose. Review diabetes medications with your doctor. If receiving insulin or sulfonylurea, dose adjustment may be needed.": {
     "en": "You had a low blood sugar episode. Use the 15/15 rule: 15 g of fast sugar, wait 15 minutes, recheck. Ask your doctor if any medication doses need adjusting.",
@@ -33,7 +33,7 @@
   },
   "Diabetes diagnostic criteria met. Schedule clinical evaluation including: (1) Confirmatory lab test if single abnormal result. (2) HbA1c target goal setting. (3) Retinal and foot examination. (4) Lipid panel and blood pressure assessment. (5) Diabetes self-management education and support (DSMES).": {
     "en": "Your results meet the diabetes criteria. Book a clinic visit within 1–2 weeks to confirm, set targets and start treatment.",
-    "km": "លទ្ធផលរបស់អ្នកបំពេញលក្ខខណ្ឌទឹកនោមផ្អែម។ កោះចូលគ្លីនិកក្នុង 1–2 សប្តាហ៍ ដើម្បីបញ្ជាក់ កំណត់គោលដៅ និងចាប់ផ្តើមព្យាបាល។"
+    "km": "លទ្ធផលរបស់អ្នកបំពេញគ្រប់លក្ខខណ្ឌនៃជំងឺទឹកនោមផ្អែម។ សូមណាត់ជួបគ្រូពេទ្យនៅគ្លីនិកក្នុងរយៈពេល ១–២ សប្តាហ៍ ដើម្បីបញ្ជាក់លទ្ធផល កំណត់គោលដៅ និងចាប់ផ្តើមការព្យាបាល។"
   },
   "Assessment lacks laboratory data. A definitive diabetes diagnosis requires at least one of: (1) Fasting plasma glucose (≥8h fast). (2) HbA1c (NGSP-certified lab). (3) 75-g oral glucose tolerance test (2-hour value). Complete these tests to improve assessment reliability.": {
     "en": "No blood test yet — that is fine for a first screening. A simple fasting glucose or HbA1c test at any lab will make the result far more certain.",
@@ -49,7 +49,7 @@
   },
   "Diabetes confirmed by dual criteria. Comprehensive management plan: (1) Set individualized HbA1c target (generally <7% for most adults). (2) Initiate metformin as first-line therapy unless contraindicated. (3) Retinal screening within 5 years of diagnosis for T2D (at diagnosis for T1D). (4) Annual foot exam. (5) Lipid panel and statin therapy if indicated. (6) Blood pressure target <130/80 mmHg. (7) Diabetes self-management education. (8) Psychological well-being assessment.": {
     "en": "Diabetes is confirmed by two matching tests. Book your doctor within 1–2 weeks: sugar targets, metformin first (usually), plus eye and foot checks.",
-    "km": "តេស្តពីរដូចគ្នាបញ្ជាក់ថាមានទឹកនោមផ្អែម។ កោះជួបគ្រូពេទ្យក្នុង 1–2 សប្តាហ៍៖ កំណត់គោលដៅស្ករ ថ្នាំ Metformin ជាដំបូង (ភាគច្រើន) ហើយពិនិត្យភ្នែក និងជើងផង។"
+    "km": "លទ្ធផលតេស្តស្របគ្នាទាំងពីរបានបញ្ជាក់ថាមានជំងឺទឹកនោមផ្អែម។ សូមណាត់ជួបគ្រូពេទ្យក្នុងរយៈពេល ១–២ សប្តាហ៍៖ កំណត់គោលដៅជាតិស្ករ ចាប់ផ្តើមថ្នាំ Metformin ជាដំបូង (ជាទូទៅ) ព្រមទាំងពិនិត្យភ្នែក និងជើងផងដែរ។"
   },
   "Neuropathy Warning: Patient reports tingling in extremities. Recommend comprehensive foot exam, checking for peripheral pulse, and tuning fork/monofilament sensory assessment.": {
     "en": "Tingling in hands or feet can mean nerves are irritated by years of high sugar. Tell your doctor, and check your feet daily for numbness or sores.",
@@ -65,7 +65,7 @@
   },
   "Classic diabetes symptoms present but no laboratory data available. Urgently obtain: (1) Fasting plasma glucose. (2) HbA1c. (3) Random plasma glucose if fasting not possible. These tests are required for definitive diagnosis.": {
     "en": "Your symptoms are the classic diabetes signs, but a blood test is still needed to confirm. Book one this week — it takes minutes.",
-    "km": "រោគសញ្ញារបស់អ្នកគឺជាសញ្ញាទឹកនោមផ្អែមសំខាន់ៗ ប៉ុន្តែនៅតែត្រូវការតេស្តឈាមដើម្បីបញ្ជាក់។ កោះធ្វើក្នុងសប្តាហ៍នេះ — ចំណាយពេលប៉ុន្មាននាទីប៉ុណ្ណោះ។"
+    "km": "រោគសញ្ញារបស់អ្នកគឺជាសញ្ញាសំខាន់ៗនៃជំងឺទឹកនោមផ្អែម ប៉ុន្តែនៅតែត្រូវការការធ្វើតេស្តឈាមដើម្បីបញ្ជាក់ឱ្យច្បាស់។ សូមណាត់ធ្វើតេស្តក្នុងសប្តាហ៍នេះ — ដោយចំណាយពេលត្រឹមតែប៉ុន្មាននាទីប៉ុណ្ណោះ។"
   },
   "Multiple diabetes-associated symptoms detected (neuropathy signs + frequent infections). Priority laboratory testing recommended: HbA1c and fasting glucose within 1 week.": {
     "en": "Nerve tingling plus repeated infections suggests long-standing high sugar. Do an HbA1c and fasting glucose test within 1 week.",
@@ -81,15 +81,15 @@
   },
   "EMERGENCY: Level 3 severe hypoglycemia (<40 mg/dL). Call emergency services immediately. Administer glucagon if available. Do NOT attempt to give oral glucose if patient is unconscious or unable to swallow safely.": {
     "en": "EMERGENCY: severe low blood sugar. Call emergency services now. If unconscious, never give food or drink by mouth.",
-    "km": "អាសន្ន៖ ស្ករក្នុងឈាមទាបធ្ងន់ធ្ងរ។ ហៅសង្គ្រោះបន្ទាន់ឥឡូវនេះ។ បើដកហ៊ុតស្មារតី កុំបង្ខំអោយទទួលទានអាហារ ឬទឹកតាមមាត់ដាច់ខាត។"
+    "km": "ស្ថានភាពអាសន្ន៖ កម្រិតជាតិស្ករក្នុងឈាមធ្លាក់ចុះទាបធ្ងន់ធ្ងរ។ សូមហៅសង្គ្រោះបន្ទាន់ឥឡូវនេះ។ ប្រសិនបើអ្នកជំងឺសន្លប់បាត់បង់ស្មារតី ដាច់ខាតកុំបញ្ចុកអាហារ ឬទឹកតាមមាត់ឱ្យសោះ។"
   },
   "Diabetic neuropathy likely: Tingling extremities with confirmed hyperglycemia. Urgent referrals needed: (1) Comprehensive foot examination with monofilament testing. (2) Nerve conduction study. (3) Tight glycemic control to prevent progression. (4) Neuropathic pain management if symptomatic.": {
     "en": "Nerve signs with confirmed high sugar mean early diabetic neuropathy. You need a foot exam and steadier sugar control — see your doctor within 2 weeks.",
-    "km": "សញ្ញាសរសៃប្រសាទជាមួយស្ករខ្ពស់ច្បាស់ មានន័យថាសរសៃប្រសាទពិការដំបូង។ អ្នកត្រូវពិនិត្យជើង និងគ្រប់គ្រងស្ករអោយនឹងជើង — ជួបគ្រូពេទ្យក្នុង 2 សប្តាហ៍។"
+    "km": "រោគសញ្ញាសរសៃប្រសាទរួមជាមួយជាតិស្ករខ្ពស់ដែលបានបញ្ជាក់ មានន័យថាជាសញ្ញាដំបូងនៃការខូចសរសៃប្រសាទដោយសារជំងឺទឹកនោមផ្អែម (Diabetic neuropathy)។ អ្នកត្រូវពិនិត្យសុខភាពជើង និងគ្រប់គ្រងកម្រិតជាតិស្ករឱ្យមានលំនឹងល្អ — សូមជួបពិគ្រោះជាមួយគ្រូពេទ្យក្នុងរយៈពេល ២ សប្តាហ៍។"
   },
   "High compound risk identified (smoking + obesity + family history). Urgent recommendations: (1) Smoking cessation program. (2) Weight management target 5-10% reduction. (3) Annual HbA1c and lipid monitoring. (4) CardioVascular risk assessment. (5) Consider aspirin therapy if CVD risk >10%.": {
     "en": "Smoking, weight and family history multiply each other's risk. Quitting smoking is the single biggest step — then weight, movement and yearly checks.",
-    "km": "បំពក់បារី ទម្ងន់ និងប្រវត្តិគ្រួសារ ធ្វើអោយហានិភ័យខ្ពស់ដូចគុណគ្នា។ ការឈប់បំពក់បារីគឺជាជំហានធំបំផុត — បន្ទាប់មកទម្ងន់ ការហាត់ប្រាណ និងការពិនិត្យជាប្រចាំ។"
+    "km": "ការជក់បារី ទម្ងន់លើស និងប្រវត្តិគ្រួសារ បង្កើនហានិភ័យគុណនឹងគ្នាទៅវិញទៅមក។ ការផ្តាច់បារី គឺជាជំហានដ៏សំខាន់បំផុត — បន្ទាប់មកគឺការគ្រប់គ្រងទម្ងន់ ធ្វើលំហាត់ប្រាណ និងពិនិត្យសុខភាពជាប្រចាំឆ្នាំ។"
   },
   "PCOS + prediabetes: Accelerated diabetes risk. Recommend: (1) Metformin therapy (addresses both PCOS and diabetes prevention). (2) Weight management. (3) HbA1c monitoring every 6 months. (4) Endocrine referral for comprehensive PCOS management.": {
     "en": "PCOS with prediabetes speeds up diabetes risk. Metformin helps both; recheck HbA1c every 6 months and ask for a PCOS care plan.",
@@ -121,7 +121,7 @@
   },
   "Diabetes confirmed by all three diagnostic criteria (FPG, HbA1c, OGTT). Immediate action: (1) Schedule endocrinology or primary care appointment within 1-2 weeks. (2) Begin diabetes self-management education. (3) Comprehensive screening for complications (eyes, feet, kidneys, cardiovascular). (4) Treatment initiation based on clinical presentation.": {
     "en": "All three lab criteria confirm diabetes. Book a clinic visit within 1–2 weeks to start treatment and complication screening.",
-    "km": "លក្ខខណ្ឌ Lab ទាំងបីបញ្ជាក់ថាមានទឹកនោមផ្អែម។ កោះចូលគ្លីនិកក្នុងរយៈពេល 1–2 សប្តាហ៍ ដើម្បីចាប់ផ្តើមព្យាបាល និងពិនិត្យផលប៉ះពាល់។"
+    "km": "លក្ខខណ្ឌតេស្តឈាមទាំងបីបញ្ជាក់ថាមានជំងឺទឹកនោមផ្អែម។ សូមណាត់ជួបពិគ្រោះនៅគ្លីនិកក្នុងរយៈពេល ១–២ សប្តាហ៍ ដើម្បីចាប់ផ្តើមការព្យាបាល និងពិនិត្យផលវិបាកនានា។"
   },
   "Your lab values are currently normal, but you report symptoms associated with diabetes. Recommendations: (1) Repeat fasting glucose in 1–3 months. (2) Request HbA1c if not already tested. (3) Consider OGTT for more sensitive detection. (4) Investigate other potential causes of your symptoms with your doctor. (5) Monitor symptom changes.": {
     "en": "Your blood tests look normal today, but your symptoms are still classic diabetes signs — symptoms can appear before blood sugar rises. Keep watching them and re-test in 1–3 months.",
@@ -133,7 +133,7 @@
   },
   "OGTT result combined with classic symptoms strongly indicates diabetes. Please schedule a comprehensive diabetes evaluation within 1-2 weeks. Treatment initiation should not be delayed.": {
     "en": "The glucose test plus classic symptoms strongly indicates diabetes. Book a full diabetes evaluation within 1–2 weeks — treatment should not wait.",
-    "km": "តេស្តស្កររួមជាមួយរោគសញ្ញាសំខាន់ៗ ចង្អុលខ្លាំងទៅទឹកនោមផ្អែម។ កោះធ្វើការវាយតម្លៃពេញលេញក្នុង 1–2 សប្តាហ៍ — ការព្យាបាលកុំរង់ចាំ។"
+    "km": "លទ្ធផលតេស្តជាតិស្ករបូករួមជាមួយរោគសញ្ញាសំខាន់ៗ ចង្អុលបង្ហាញយ៉ាងច្បាស់ពីជំងឺទឹកនោមផ្អែម។ សូមណាត់ជួបដើម្បីធ្វើការវាយតម្លៃជំងឺទឹកនោមផ្អែមពេញលេញក្នុងរយៈពេល ១–២ សប្តាហ៍ — ការព្យាបាលមិនគួរពន្យារពេលឡើយ។"
   },
   "Diabetes confirmed. Your comprehensive care plan should include: (1) Individualized HbA1c target (generally <7% for most adults, <6.5% if low hypoglycemia risk). (2) Metformin as first-line therapy unless contraindicated. (3) SGLT2 inhibitor or GLP-1 receptor agonist if cardiovascular or renal disease risk. (4) Retinal screening within 5 years (or at diagnosis for T2D). (5) Annual foot exam and vaccination schedule. (6) Lipid panel — statin therapy if indicated. (7) Blood pressure target <130/80 mmHg. (8) Diabetes self-management education. (9) Psychological well-being assessment. (10) Ongoing HbA1c monitoring every 3 months until stable, then every 6 months.": {
     "en": "Diabetes confirmed. Your care plan: sugar targets, metformin first (usually), eye and foot checks, blood pressure and cholesterol care, and diabetes education — start within 1–2 weeks.",
@@ -157,7 +157,7 @@
   },
   "New bed-wetting with increased urination in a child is a diabetes red flag. Arrange same-day clinical review with a finger-prick glucose test.": {
     "en": "New bed-wetting with extra urination in a child is a red flag for type 1 diabetes. Get a finger-prick glucose check today.",
-    "km": "ការលូតកន្ទក់ថ្មីជាមួយការឡើងទឹកច្រើនក្នុងកុមារ គឺជាសញ្ញាព្រមាននៃទឹកនោមផ្អែមប្រភេទទី 1។ សូមវាស់ស្ករដោយចុបម្រាមដៃថ្ងៃនេះ។"
+    "km": "ការនោមដាក់កន្ទេលឡើងវិញ រួមជាមួយការបត់ជើងតូចញឹកញាប់លើកុមារ គឺជាសញ្ញាព្រមាននៃជំងឺទឹកនោមផ្អែមប្រភេទទី ១។ សូមពិនិត្យជាតិស្ករដោយចាក់ឈាមចុងម្រាមដៃនៅថ្ងៃនេះ។"
   },
   "Recurrent infections with elevated glucose suggest glucose-driven infection risk. Treat the infection and improve glycemic control — discuss with the clinical team.": {
     "en": "High sugar feeds infections. Treating the infection and lowering sugar work together — discuss both with your care team.",
@@ -165,7 +165,7 @@
   },
   "Sudden onset with weight loss fits a Type 1 pattern. This can progress to diabetic ketoacidosis quickly — urgent same-week medical review is required, do not wait for routine appointments.": {
     "en": "Sudden symptoms with weight loss fit the type 1 pattern — it can worsen within days. Get a medical review this week; do not wait for a routine appointment.",
-    "km": "រោគសញ្ញាឡើងលឿនជាមួយការស្រកទម្ងន់ ស្របនឹងលំនាំប្រភេទទី 1 — អាចកាន់តែអាក្រក់ក្នុងរយៈពេលប៉ុន្មានថ្ងៃ។ សូមអោយគ្រូពេទ្យពិនិត្យក្នុងសប្តាហ៍នេះ។ កុំរង់ចាំការកោះជួបធម្មតា។"
+    "km": "រោគសញ្ញាដែលលេចឡើងលឿនរួមជាមួយការស្រកទម្ងន់ ស្របទៅនឹងទម្រង់ជំងឺទឹកនោមផ្អែមប្រភេទទី ១ — ស្ថានភាពនេះអាចកាន់តែធ្ងន់ធ្ងរក្នុងរយៈពេលប៉ុន្មានថ្ងៃ។ សូមទៅជួបគ្រូពេទ្យពិនិត្យក្នុងសប្តាហ៍នេះ ដោយកុំរង់ចាំការណាត់ជួបធម្មតាឡើយ។"
   },
   "Ketosis signs with high blood glucose can indicate DKA. Seek emergency care now — do not wait for lab confirmation.": {
     "en": "Ketone signs with high blood sugar can mean DKA. Seek emergency care now — do not wait for lab confirmation.",
@@ -173,7 +173,7 @@
   },
   "Lean body habitus with catabolic weight loss is atypical for Type 2. Ask the clinician about autoantibody (GAD) and C-peptide testing to distinguish Type 1 / LADA.": {
     "en": "A lean body with rapid weight loss is unusual for type 2. Ask about GAD-antibody and C-peptide tests — they separate type 1/LADA from type 2.",
-    "km": "រាងកាយស្គាំងជាមួយការស្រកទម្ងន់លឿន មិនសូវស្របនឹងប្រភេទទី 2 ទេ។ សូមសួរពីតេស្ត GAD-antibody និង C-peptide — វាបែងចែកប្រភេទទី 1/LADA ពីប្រភេទទី 2 បាន។"
+    "km": "រាងកាយស្គមស្គាំងរួមជាមួយការស្រកទម្ងន់យ៉ាងលឿន គឺកម្រកើតមានលើជំងឺទឹកនោមផ្អែមប្រភេទទី ២ ណាស់។ សូមសួរនាំគ្រូពេទ្យអំពីការធ្វើតេស្ត GAD-antibody និង C-peptide — តេស្តទាំងនេះអាចជួយបែងចែកជំងឺទឹកនោមផ្អែមប្រភេទទី ១/LADA ពីប្រភេទទី ២ បាន។"
   },
   "The evidence pattern mixes features of Type 1 and Type 2. Ask about autoantibody (GAD) and C-peptide testing — overlapping presentations such as LADA are easily missed and are treated differently.": {
     "en": "Your signs mix type 1 and type 2 features. Ask about GAD-antibody and C-peptide testing — overlapping patterns are treated differently.",
@@ -181,7 +181,7 @@
   },
   "Diabetes confirmed by concordant laboratory criteria. Please schedule an appointment with your physician within 1–2 weeks for: (1) Individualized HbA1c target setting. (2) First-line therapy initiation (typically metformin). (3) Retinal screening referral. (4) Comprehensive foot examination. (5) Lipid panel and cardiovascular risk assessment. (6) Diabetes self-management education enrollment.": {
     "en": "Diabetes is confirmed by two matching tests. Book your doctor within 1–2 weeks: sugar targets, metformin first (usually), plus eye and foot checks.",
-    "km": "តេស្តពីរដូចគ្នាបញ្ជាក់ថាមានទឹកនោមផ្អែម។ កោះជួបគ្រូពេទ្យក្នុង 1–2 សប្តាហ៍៖ កំណត់គោលដៅស្ករ ថ្នាំ Metformin ជាដំបូង (ភាគច្រើន) ហើយពិនិត្យភ្នែក និងជើងផង។"
+    "km": "លទ្ធផលតេស្តស្របគ្នាទាំងពីរបានបញ្ជាក់ថាមានជំងឺទឹកនោមផ្អែម។ សូមណាត់ជួបគ្រូពេទ្យក្នុងរយៈពេល ១–២ សប្តាហ៍៖ កំណត់គោលដៅជាតិស្ករ ចាប់ផ្តើមថ្នាំ Metformin ជាដំបូង (ជាទូទៅ) ព្រមទាំងពិនិត្យភ្នែក និងជើងផងដែរ។"
   },
   "Your test results are consistent with diabetes. A confirmatory test is recommended unless you have unequivocal hyperglycemia symptoms. Please see your healthcare provider within 1–2 weeks for confirmation and treatment planning.": {
     "en": "Your results fit diabetes. A quick confirmatory test plus a doctor visit within 1–2 weeks settles it and starts treatment.",
@@ -201,7 +201,7 @@
   },
   "You have classic diabetes symptoms (increased urination, excessive thirst, unexplained weight loss). These warrant urgent laboratory testing: (1) Fasting plasma glucose. (2) HbA1c. (3) Random plasma glucose if fasting not possible. Please see a healthcare provider within 1 week.": {
     "en": "Your symptoms are the classic diabetes signs, but a blood test is still needed to confirm. Book one this week — it takes minutes.",
-    "km": "រោគសញ្ញារបស់អ្នកគឺជាសញ្ញាទឹកនោមផ្អែមសំខាន់ៗ ប៉ុន្តែនៅតែត្រូវការតេស្តឈាមដើម្បីបញ្ជាក់។ កោះធ្វើក្នុងសប្តាហ៍នេះ — ចំណាយពេលប៉ុន្មាននាទីប៉ុណ្ណោះ។"
+    "km": "រោគសញ្ញារបស់អ្នកគឺជាសញ្ញាសំខាន់ៗនៃជំងឺទឹកនោមផ្អែម ប៉ុន្តែនៅតែត្រូវការការធ្វើតេស្តឈាមដើម្បីបញ្ជាក់ឱ្យច្បាស់។ សូមណាត់ធ្វើតេស្តក្នុងសប្តាហ៍នេះ — ដោយចំណាយពេលត្រឹមតែប៉ុន្មាននាទីប៉ុណ្ណោះ។"
   },
   "You have diabetes-related symptoms but no laboratory data was available. Symptoms alone cannot confirm or rule out diabetes. Priority action: Obtain fasting glucose and HbA1c within 1 week for definitive assessment.": {
     "en": "Your answers match common diabetes signs. A simple blood test (fasting glucose or HbA1c) will confirm — any lab, results usually the same day.",
@@ -209,7 +209,7 @@
   },
   "Signs of possible neuropathy have been detected. This may indicate longstanding undiagnosed diabetes. Recommended evaluations: (1) Comprehensive foot exam with monofilament testing. (2) HbA1c and fasting glucose (if not already done). (3) Nerve conduction study if symptoms persist. (4) Please see your doctor within 2 weeks.": {
     "en": "Nerve signs with confirmed high sugar mean early diabetic neuropathy. You need a foot exam and steadier sugar control — see your doctor within 2 weeks.",
-    "km": "សញ្ញាសរសៃប្រសាទជាមួយស្ករខ្ពស់ច្បាស់ មានន័យថាសរសៃប្រសាទពិការដំបូង។ អ្នកត្រូវពិនិត្យជើង និងគ្រប់គ្រងស្ករអោយនឹងជើង — ជួបគ្រូពេទ្យក្នុង 2 សប្តាហ៍។"
+    "km": "រោគសញ្ញាសរសៃប្រសាទរួមជាមួយជាតិស្ករខ្ពស់ដែលបានបញ្ជាក់ មានន័យថាជាសញ្ញាដំបូងនៃការខូចសរសៃប្រសាទដោយសារជំងឺទឹកនោមផ្អែម (Diabetic neuropathy)។ អ្នកត្រូវពិនិត្យសុខភាពជើង និងគ្រប់គ្រងកម្រិតជាតិស្ករឱ្យមានលំនឹងល្អ — សូមជួបពិគ្រោះជាមួយគ្រូពេទ្យក្នុងរយៈពេល ២ សប្តាហ៍។"
   },
   "Your profile is consistent with metabolic syndrome — a cluster of conditions that significantly increase cardiovascular and diabetes risk. Recommendations: (1) Blood pressure monitoring and control (target <130/80 mmHg). (2) Lipid management (consider statin therapy if LDL elevated). (3) Weight management (target 5–10% reduction). (4) Regular physical activity. (5) Annual cardiovascular risk assessment.": {
     "en": "Your blood pressure, weight and cholesterol pattern raise heart and diabetes risk. Move more, eat plainer, and treat blood pressure and cholesterol with your doctor.",
@@ -245,6 +245,6 @@
   },
   "NOTE_URGENT_SAFETY": {
     "en": "Seek urgent in-person medical care now. If symptoms are severe or getting worse, go straight to emergency care.",
-    "km": "សូមទៅជួបគ្រូពេទ្យបន្ទាន់ឥឡូវនេះ។ បើរោគសញ្ញាធ្ងន់ធ្ងរ ឬកាន់តែអាក្រក់ ទៅត្រង់ជំពូកសង្គ្រោះបន្ទាន់។"
+    "km": "សូមទៅជួបគ្រូពេទ្យជាបន្ទាន់ឥឡូវនេះ។ ប្រសិនបើរោគសញ្ញាធ្ងន់ធ្ងរ ឬកាន់តែដុនដាបខ្លាំង សូមទៅកាន់ផ្នែកសង្គ្រោះបន្ទាន់ភ្លាមៗ។"
   }
 }

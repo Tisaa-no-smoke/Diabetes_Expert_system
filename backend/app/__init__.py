@@ -165,10 +165,17 @@ def create_app(config_object=Config):
         _ensure_fact_columns()
 
         if app.config.get("SEED_DEMO_DATA", True):
-            table_names = set(inspect(db.engine).get_table_names())
-            required_seed_tables = {"users", "roles", "permissions", "rules", "rule_categories"}
-            if required_seed_tables.issubset(table_names):
-                seed_demo_data()
+            # Only run automatic seed if database has not been seeded yet
+            from app.models.entities import User
+            try:
+                if not User.query.first():
+                    table_names = set(inspect(db.engine).get_table_names())
+                    required_seed_tables = {"users", "roles", "permissions", "rules", "rule_categories"}
+                    if required_seed_tables.issubset(table_names):
+                        app.logger.info("Database not yet seeded; initializing demo data...")
+                        seed_demo_data()
+            except Exception as e:
+                app.logger.warning("Could not check seed status: %s", e)
 
     from flask import redirect, render_template, url_for
 
@@ -207,6 +214,12 @@ def _resolve_startup_database(app: Flask):
     primary_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
     app.config["DB_PRIMARY_DATABASE_URI"] = primary_uri
     app.config["DB_FALLBACK_ACTIVE"] = False
+
+    if str(primary_uri).startswith("sqlite"):
+        app.config.pop("SQLALCHEMY_ENGINE_OPTIONS", None)
+        _ensure_sqlite_parent_dir_exists(primary_uri)
+        app.logger.info("Using local SQLite database: %s", primary_uri)
+        return
 
     if not app.config.get("DB_FALLBACK_ENABLED", False):
         return

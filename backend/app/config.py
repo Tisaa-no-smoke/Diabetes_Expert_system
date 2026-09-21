@@ -38,7 +38,7 @@ def _resolve_secret_key() -> str:
 
 
 def _normalize_database_url(url: str) -> str:
-    """Normalize PostgreSQL URL schemes to ensure compatibility with psycopg v3."""
+    """Normalize database URL schemes and paths to ensure cross-platform compatibility."""
     if not url:
         return url
     trimmed = url.strip()
@@ -46,6 +46,17 @@ def _normalize_database_url(url: str) -> str:
         return f"postgresql+psycopg://{trimmed[len('postgres://'):]}"
     if trimmed.startswith("postgresql://") and not trimmed.startswith("postgresql+"):
         return f"postgresql+psycopg://{trimmed[len('postgresql://'):]}"
+    if trimmed.startswith("sqlite:///"):
+        sqlite_path = trimmed[len("sqlite:///"):]
+        if not sqlite_path.startswith("/") and sqlite_path != ":memory:":
+            backend_dir = Path(__file__).resolve().parents[1]
+            if sqlite_path.startswith("instance/"):
+                full_path = (backend_dir / sqlite_path).resolve()
+            elif sqlite_path.startswith("backend/instance/"):
+                full_path = (backend_dir.parent / sqlite_path).resolve()
+            else:
+                full_path = (backend_dir / "instance" / sqlite_path).resolve()
+            return f"sqlite:///{full_path}"
     return trimmed
 
 
@@ -73,13 +84,17 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _resolve_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = _as_bool(os.getenv("SQLALCHEMY_ECHO"), default=False)
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
-        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
-        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
-        "pool_pre_ping": True,
-    }
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        {}
+        if _resolve_database_url().startswith("sqlite")
+        else {
+            "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
+            "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+            "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+            "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+            "pool_pre_ping": True,
+        }
+    )
 
     CORS_ORIGINS = _as_list(
         os.getenv("CORS_ORIGINS"),

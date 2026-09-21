@@ -484,7 +484,7 @@ FACT_CATALOG_SEED = [
     {
         'key': 'bed_wetting',
         'label': 'Bed-Wetting in Children',
-        'label_km': 'ស្រោចលើគ្រែ (កុមារ)',
+        'label_km': 'នោមដាក់កន្ទេល (កុមារ)',
         'medical_term': 'Secondary nocturnal enuresis',
         'category': 'pediatric',
         'question': 'Has bed-wetting started in a child who was previously dry at night?',
@@ -603,7 +603,7 @@ FACT_CATALOG_SEED = [
         'meaning': 'Can be a warning sign of low blood sugar (hypoglycemia).',
         'meaning_km': 'អាចជាសញ្ញាជាតិស្ករទាប (hypoglycemia)។',
         'prevention': 'Check blood sugar — sweating can signal a low; keep fast-acting sugar within reach.',
-        'prevention_km': 'ពិនិត្យជាតិស្ករក្នុងឈាម — ញៀរញាប់អាចជាសញ្ញាជាតិស្ករទាប។ កាន់ស្កររលត់លឿននៅជាប់ខ្លួនជានិច្ច។',
+        'prevention_km': 'ពិនិត្យជាតិស្ករក្នុងឈាម — ការបែកញើសអាចជាសញ្ញានៃជាតិស្ករទាប។ គួរទុកជាតិស្ករស្រូបលឿននៅជាប់ខ្លួនជានិច្ច។',
         'weight': 0.1,
         'type_indication': 'both',
         'is_cardinal': False,
