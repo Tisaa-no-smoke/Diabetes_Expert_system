@@ -4,6 +4,8 @@ from app.expert_system.grouped_forward_chaining import GroupedForwardChainer
 from app.expert_system.patient_messaging import LAB_NORMAL_BUT_SYMPTOMS_NOTE
 from app.expert_system.recommendations import select_recommendation
 from app.expert_system.rule_loading import RuleLoader
+from app.expert_system.forward_chaining import _parse_fact_assignment
+from app.utils.diabetes_knowledge_extensions import KNOWLEDGE_MESSAGES
 
 
 DIAGNOSIS_BY_CONCLUSION = {
@@ -76,10 +78,14 @@ MIN_PRESENCE_CERTAINTY = 0.45
 
 
 def run_inference(payload, rules):
-    prepared_facts = prepare_facts(payload)
-
     rule_loader = RuleLoader()
     load_result = rule_loader.load(rules)
+    output_keys = {
+        _parse_fact_assignment(action.action_value)[0]
+        for rule in load_result.rules for action in rule.actions
+        if action.action_type == "assert_fact"
+    } | {"urgent_flag"}
+    prepared_facts = prepare_facts(payload, rule_output_keys=output_keys)
 
     grouped_chainer = GroupedForwardChainer()
     inference_result = grouped_chainer.run(prepared_facts.facts, load_result.rules)
@@ -94,6 +100,13 @@ def run_inference(payload, rules):
         top_conclusion=top_conclusion,
         recommendation_candidates=inference_result.recommendation_candidates,
     )
+
+    if inference_result.final_facts.get("discordant_glycemic_tests"):
+        context_note = KNOWLEDGE_MESSAGES["discordant"]["en"]
+        if urgency != "emergency":
+            recommendation = context_note
+    elif inference_result.final_facts.get("repeat_testing_recommended") and urgency != "emergency":
+        recommendation = KNOWLEDGE_MESSAGES["confirmation"]["en"]
 
     triggered_rules = [_serialize_triggered_rule(row) for row in inference_result.fired_rules]
 
@@ -175,6 +188,12 @@ def _resolve_headline(ranked_conclusions: list[dict]) -> tuple[str, float, str |
         str(item.get("conclusion") or ""): float(item.get("certainty") or 0)
         for item in ranked_conclusions
     }
+
+    # A diabetes-range result takes precedence over a prediabetes/risk band
+    # on another assay. Combining weaker rules must not reverse that finding.
+    for diabetes_conclusion in ("diabetes_confirmed", "diabetes_likely"):
+        if by_conclusion.get(diabetes_conclusion, 0) >= 0.3 and top_conclusion not in {"diabetes_confirmed", "diabetes_likely", "gestational_diabetes_likely"}:
+            return diabetes_conclusion, by_conclusion[diabetes_conclusion], None
 
     best_presence, presence_certainty = None, 0.0
     for name in PRESENCE_CONCLUSIONS:
@@ -351,9 +370,13 @@ def _resolve_urgency(top_conclusion: str, certainty: float, facts: dict, suspect
         return "emergency"
     if facts.get("level3_hypoglycemia"):
         return "emergency"
+    if facts.get("hypoglycemia"):
+        return "urgent"
 
     # Map-based urgency
     base = URGENCY_MAP.get(top_conclusion, "routine")
+    if facts.get("clinical_review_recommended") and base == "routine":
+        base = "soon"
 
     # Ketone signs without lab values: same-day care, never routine
     if facts.get("ketosis_signs_present") and base in ("routine", "soon"):

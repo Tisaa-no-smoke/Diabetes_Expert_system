@@ -4,6 +4,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import click
 from flask import Flask
 from flask_cors import CORS
 from sqlalchemy import create_engine, inspect, text
@@ -65,6 +66,20 @@ def _add_security_headers(app: Flask):
 
 def _register_cli_commands(app: Flask):
     """Register custom CLI commands for maintenance tasks."""
+
+    @app.cli.command("sync-knowledge-base")
+    @click.option("--version", type=click.Choice(["v1", "v2", "v3"]), default=None)
+    def sync_knowledge_base_command(version):
+        """Synchronize the selected rules and fact catalog, preserving accounts."""
+        from .utils.seed import sync_knowledge_base
+
+        if version:
+            app.config["RULES_SEED_VERSION"] = version
+        result = sync_knowledge_base()
+        click.echo(
+            f"Knowledge base synchronized ({app.config['RULES_SEED_VERSION']}): "
+            f"{result['rules']} active rules, {result['facts']} facts."
+        )
 
     @app.cli.command("cleanup-tokens")
     def cleanup_tokens():
@@ -204,7 +219,17 @@ def create_app(config_object=Config):
                     if required_seed_tables.issubset(table_names):
                         app.logger.info("Database not yet seeded; initializing demo data...")
                         seed_demo_data()
+                elif "facts" not in inspect(db.engine).get_table_names():
+                    # Older databases may have users and rules but no catalog.
+                    # Heal that table without resetting the existing seed data.
+                    from .models import Fact
+                    from .utils.seed import _seed_fact_catalog
+
+                    Fact.__table__.create(db.engine, checkfirst=True)
+                    _seed_fact_catalog()
+                    db.session.commit()
             except Exception as e:
+                db.session.rollback()
                 app.logger.warning("Could not check seed status: %s", e)
 
     from flask import redirect, render_template, url_for
