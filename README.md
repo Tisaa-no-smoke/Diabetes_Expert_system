@@ -2,6 +2,43 @@
 
 A professional, full-stack web application designed to leverage an expert system for diabetes diagnosis, management recommendations, and clinical workflow tracking. Built with a modern **React (Vite+Tailwind)** frontend and a robust **Flask** backend, fortified by secure role-based access control (RBAC), and backed by a **Supabase PostgreSQL** database.
 
+![Doctor dashboard](docs/screenshots/doctor-dashboard.png)
+
+---
+
+## 📸 Screenshots
+
+### Sign in
+![Login page](docs/screenshots/login.png)
+
+### Doctor workspace
+| Assessment workspace | Diagnosis result |
+|---|---|
+| ![Assessment workspace](docs/screenshots/diagnosis-assessment.png) | ![Diagnosis result](docs/screenshots/diagnosis-result.png) |
+
+| Patient management | Patient detail |
+|---|---|
+| ![Patient list](docs/screenshots/patients.png) | ![Patient detail](docs/screenshots/patient-detail.png) |
+
+| Clinical review | Knowledge base |
+|---|---|
+| ![Clinical review](docs/screenshots/medical-review.png) | ![Knowledge base rules](docs/screenshots/rules-knowledge-base.png) |
+
+### Patient portal
+| Patient dashboard | Care plan |
+|---|---|
+| ![Patient dashboard](docs/screenshots/patient-dashboard.png) | ![Care plan](docs/screenshots/care-plan.png) |
+
+### Administration
+| User directory | Audit logs |
+|---|---|
+| ![User directory](docs/screenshots/admin-users.png) | ![Audit logs](docs/screenshots/audit-logs.png) |
+
+### Dark mode & mobile
+| Dark mode | Mobile |
+|---|---|
+| ![Dark mode dashboard](docs/screenshots/dark-mode-dashboard.png) | <img src="docs/screenshots/mobile-patient-dashboard.png" alt="Mobile patient dashboard" width="300"> |
+
 ---
 
 ## 🎯 Key Features
