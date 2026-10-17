@@ -1,3 +1,4 @@
+from flask import g, has_request_context
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -14,10 +15,30 @@ class UserRepository:
         return User.query.filter_by(email=email).first()
 
     def get_by_id(self, user_id: int) -> User | None:
-        # Direct grants are consulted on every authenticated request. Loading
-        # them with the user avoids adding a separate permission query to the
-        # authorization path for every API call.
-        return db.session.get(User, user_id, options=[joinedload(User.direct_permissions)])
+        # Roles, permissions, and the patient profile are consulted on every
+        # authenticated request. Loading them with the user keeps the auth path
+        # to a single round-trip, which matters on a remote database. The id is
+        # normalised to int because JWT "sub" claims are strings and a string
+        # key misses the session identity map, re-querying the same user.
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            return None
+        user = db.session.get(
+            User,
+            user_id,
+            options=[
+                joinedload(User.direct_permissions),
+                joinedload(User.roles).joinedload(Role.permissions),
+                joinedload(User.patient_profile),
+            ],
+        )
+        # The session identity map holds weak references, so the user loaded
+        # while validating the token would be garbage-collected and fetched
+        # again by the next lookup. Keep it alive for the rest of the request.
+        if user is not None and has_request_context():
+            g.setdefault("_loaded_users", {})[user_id] = user
+        return user
 
     def paginate_users(
         self,
@@ -201,6 +222,15 @@ class UserRepository:
 
     def count_inactive_users(self) -> int:
         return User.query.filter(User.is_active.is_(False)).count()
+
+    def count_user_totals(self) -> dict[str, int]:
+        """Total/active/inactive user counts in a single round-trip."""
+        total, active, inactive = db.session.query(
+            func.count(User.id),
+            func.count(User.id).filter(User.is_active.is_(True)),
+            func.count(User.id).filter(User.is_active.is_(False)),
+        ).one()
+        return {"total": int(total or 0), "active": int(active or 0), "inactive": int(inactive or 0)}
 
     def count_users_by_role(self) -> dict[str, int]:
         rows = (

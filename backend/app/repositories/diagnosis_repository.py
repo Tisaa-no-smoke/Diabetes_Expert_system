@@ -19,6 +19,29 @@ class DiagnosisRepository:
     def count_reviewed_results(self) -> int:
         return DiagnosisResult.query.filter(DiagnosisResult.reviewed_at.isnot(None)).count()
 
+    def summary_counts(self, *, recent_days: int = 7) -> dict[str, int]:
+        """Admin overview counts in a single round-trip."""
+        safe_days = max(1, min(int(recent_days or 7), 90))
+        since = utc_now() - timedelta(days=safe_days)
+        row = db.session.query(
+            func.count(DiagnosisResult.id),
+            func.count(DiagnosisResult.id).filter(DiagnosisResult.is_urgent.is_(True)),
+            func.count(DiagnosisResult.id).filter(DiagnosisResult.reviewed_at.isnot(None)),
+            func.count(DiagnosisResult.id).filter(DiagnosisResult.created_at >= since),
+            func.count(DiagnosisResult.id).filter(
+                DiagnosisResult.recommendation.isnot(None),
+                DiagnosisResult.recommendation != "",
+            ),
+        ).one()
+        total, urgent, reviewed, recent, with_recommendation = (int(value or 0) for value in row)
+        return {
+            "total": total,
+            "urgent": urgent,
+            "reviewed": reviewed,
+            "recent": recent,
+            "with_recommendation": with_recommendation,
+        }
+
     def count_recent_results(self, *, days: int = 7) -> int:
         safe_days = max(1, min(int(days or 7), 90))
         since = utc_now() - timedelta(days=safe_days)

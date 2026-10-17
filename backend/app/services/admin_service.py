@@ -498,28 +498,33 @@ class AdminService:
 
     def get_system_stats(self) -> dict:
         from app.extensions import db
-        from app.models.entities import AssessmentSession, DiagnosisResult
+        from app.models.entities import AssessmentSession
         from sqlalchemy import func
 
-        users_total = self.user_repository.count_users()
-        users_active = self.user_repository.count_active_users()
-        users_inactive = self.user_repository.count_inactive_users()
+        # Counts are grouped per table: each query is a network round-trip on
+        # a remote database, so one conditional aggregate replaces several.
+        user_totals = self.user_repository.count_user_totals()
+        users_total = user_totals["total"]
+        users_active = user_totals["active"]
+        users_inactive = user_totals["inactive"]
         users_by_role = self.user_repository.count_users_by_role()
 
         patients_total = self.patient_repository.count_patients() if self.patient_repository else 0
-        rules_total = self.rule_repository.count_rules() if self.rule_repository else 0
         rules_by_status = self.rule_repository.count_rules_by_status() if self.rule_repository else {}
+        rules_total = sum(rules_by_status.values())
 
-        diagnosis_total = self.diagnosis_repository.count_results() if self.diagnosis_repository else 0
-        diagnosis_urgent = self.diagnosis_repository.count_urgent_results() if self.diagnosis_repository else 0
-        diagnosis_reviewed = self.diagnosis_repository.count_reviewed_results() if self.diagnosis_repository else 0
-        diagnosis_recent_7d = self.diagnosis_repository.count_recent_results(days=7) if self.diagnosis_repository else 0
+        diagnosis_counts = (
+            self.diagnosis_repository.summary_counts(recent_days=7)
+            if self.diagnosis_repository
+            else {"total": 0, "urgent": 0, "reviewed": 0, "recent": 0, "with_recommendation": 0}
+        )
+        diagnosis_total = diagnosis_counts["total"]
+        diagnosis_urgent = diagnosis_counts["urgent"]
+        diagnosis_reviewed = diagnosis_counts["reviewed"]
+        diagnosis_recent_7d = diagnosis_counts["recent"]
+        treatment_plans_total = diagnosis_counts["with_recommendation"]
 
         assessments_total = db.session.query(func.count(AssessmentSession.id)).scalar() or diagnosis_total
-        treatment_plans_total = db.session.query(func.count(DiagnosisResult.id)).filter(
-            DiagnosisResult.recommendation.isnot(None),
-            DiagnosisResult.recommendation != "",
-        ).scalar() or 0
 
         events_24h = self.audit_log_repository.count_recent_events(hours=24) if self.audit_log_repository else 0
 
