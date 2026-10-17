@@ -85,6 +85,34 @@ def update_my_profile():
     return success_response(data=updated_user, message="Profile updated successfully.")
 
 
+@auth_bp.post("/password")
+@limiter.limit("5 per minute")
+@require_auth()
+def change_password():
+    payload = request.get_json(silent=True) or {}
+    user_id = int(g.current_user.get("sub") or g.current_user.get("id"))
+    result = get_auth_service().change_password(
+        user_id,
+        current_password=str(payload.get("current_password") or ""),
+        new_password=str(payload.get("new_password") or ""),
+    )
+    return success_response(data=result, message="Password updated.")
+
+
+@auth_bp.post("/email")
+@limiter.limit("5 per minute")
+@require_auth()
+def change_email():
+    payload = request.get_json(silent=True) or {}
+    user_id = int(g.current_user.get("sub") or g.current_user.get("id"))
+    result = get_auth_service().change_email(
+        user_id,
+        current_password=str(payload.get("current_password") or ""),
+        new_email=str(payload.get("new_email") or ""),
+    )
+    return success_response(data=result, message="Email updated.")
+
+
 @auth_bp.post("/avatar")
 @require_auth()
 def upload_avatar():

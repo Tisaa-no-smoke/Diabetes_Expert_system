@@ -3,13 +3,18 @@ import {
   Briefcase,
   Camera,
   Check,
+  Eye,
+  EyeOff,
   Hospital,
+  KeyRound,
   Loader2,
+  Mail,
   Save,
+  ShieldCheck,
   Trash2,
   UserRound,
 } from 'lucide-react'
-import api, { getApiData, getApiErrorMessage } from '@/api/client'
+import api, { getApiData, getApiErrorMessage, setAuthTokens } from '@/api/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { FormSkeleton, UserAvatar } from '@/components/ui'
@@ -555,6 +560,9 @@ export function ProfilePage() {
                 value={user?.email || ''}
               />
             </div>
+            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              {t(`${NS}.security.emailHint`, 'Change it under Sign-in & security below.')}
+            </p>
           </div>
 
           {/* Role (read-only) */}
@@ -686,6 +694,8 @@ export function ProfilePage() {
           </button>
         </div>
       </form>
+
+      <AccountSecurityCard />
 
       {/* ── 4. Health Profile (Patients Only) ── */}
       {isPatient ? (
@@ -833,5 +843,263 @@ export function ProfilePage() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+const MIN_PASSWORD_LENGTH = 8
+const MAX_PASSWORD_LENGTH = 128
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Field errors the server can raise that the client cannot pre-check. */
+const SERVER_ERROR_KEYS = {
+  'Current password is incorrect.': ['security.errors.currentIncorrect', 'Current password is incorrect.'],
+  'Email is already in use.': ['security.errors.emailInUse', 'That email is already used by another account.'],
+}
+
+function credentialError(err, t, fallbackKey, fallback) {
+  const details = err?.response?.data?.error?.details || {}
+  const message = getApiErrorMessage(err, '')
+  const known = SERVER_ERROR_KEYS[message]
+  return {
+    field: details.field || null,
+    message: known ? t(`${NS}.${known[0]}`, known[1]) : message || t(`${NS}.${fallbackKey}`, fallback),
+  }
+}
+
+function PasswordInput({ id, value, onChange, autoComplete, invalid, placeholder }) {
+  const { t } = useLanguage()
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative mt-1.5">
+      <input
+        id={id}
+        type={visible ? 'text' : 'password'}
+        className={cn(fieldInput, 'mt-0 pr-11', invalid && 'border-rose-400 focus:border-rose-400 focus:ring-rose-100')}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        aria-invalid={invalid || undefined}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+        aria-label={visible ? t(`${NS}.security.hidePassword`, 'Hide password') : t(`${NS}.security.showPassword`, 'Show password')}
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  )
+}
+
+function FormMessage({ error, success }) {
+  if (error) {
+    return <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">{error}</p>
+  }
+  if (success) {
+    return <p role="status" className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" />{success}</p>
+  }
+  return null
+}
+
+function SubmitButton({ busy, disabled, icon: Icon, children }) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled || busy}
+      className={cn(
+        'mt-4 inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-all',
+        !disabled && !busy
+          ? 'bg-primary-600 text-white shadow-sm hover:bg-primary-700'
+          : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+      )}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Self-service sign-in email and password changes for every role. Both
+ * require the current password (Google-only accounts set a first password
+ * without one); a successful change signs out the account's other sessions
+ * and hands this session fresh tokens.
+ */
+function AccountSecurityCard() {
+  const { user, updateUser } = useAuth()
+  const { t } = useLanguage()
+  // Cached users from before this field existed are treated as having one.
+  const hasPassword = user?.has_password !== false
+
+  const [emailForm, setEmailForm] = useState({ newEmail: '', currentPassword: '' })
+  const [emailState, setEmailState] = useState({ busy: false, error: null, field: null, success: '' })
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordState, setPasswordState] = useState({ busy: false, error: null, field: null, success: '' })
+
+  const applyCredentialResult = (data) => {
+    setAuthTokens(data.access_token, data.refresh_token)
+    if (data.user) updateUser(data.user)
+  }
+
+  const handleEmailSubmit = async (event) => {
+    event.preventDefault()
+    const newEmail = emailForm.newEmail.trim().toLowerCase()
+    const fail = (field, message) => setEmailState({ busy: false, error: message, field, success: '' })
+    if (!EMAIL_PATTERN.test(newEmail)) return fail('new_email', t(`${NS}.security.errors.emailInvalid`, 'Enter a valid email address.'))
+    if (newEmail === String(user?.email || '').toLowerCase()) return fail('new_email', t(`${NS}.security.errors.emailSame`, 'This is already your email.'))
+    if (hasPassword && !emailForm.currentPassword) return fail('current_password', t(`${NS}.security.errors.currentRequired`, 'Enter your current password.'))
+
+    setEmailState({ busy: true, error: null, field: null, success: '' })
+    try {
+      const data = getApiData(await api.post('/auth/email', { new_email: newEmail, current_password: emailForm.currentPassword }))
+      applyCredentialResult(data)
+      setEmailForm({ newEmail: '', currentPassword: '' })
+      setEmailState({ busy: false, error: null, field: null, success: t(`${NS}.security.emailUpdated`, 'Email updated. Use it the next time you sign in.') })
+    } catch (err) {
+      const { field, message } = credentialError(err, t, 'security.errors.emailFailed', 'Could not update your email.')
+      fail(field, message)
+    }
+  }
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault()
+    const { currentPassword, newPassword, confirmPassword } = passwordForm
+    const fail = (field, message) => setPasswordState({ busy: false, error: message, field, success: '' })
+    if (hasPassword && !currentPassword) return fail('current_password', t(`${NS}.security.errors.currentRequired`, 'Enter your current password.'))
+    if (newPassword.length < MIN_PASSWORD_LENGTH) return fail('new_password', t(`${NS}.security.errors.passwordShort`, 'Use at least {{min}} characters.', { min: MIN_PASSWORD_LENGTH }))
+    if (newPassword.length > MAX_PASSWORD_LENGTH) return fail('new_password', t(`${NS}.security.errors.passwordLong`, 'Use at most {{max}} characters.', { max: MAX_PASSWORD_LENGTH }))
+    if (hasPassword && newPassword === currentPassword) return fail('new_password', t(`${NS}.security.errors.passwordSame`, 'Choose a password different from your current one.'))
+    if (newPassword !== confirmPassword) return fail('confirm_password', t(`${NS}.security.errors.passwordMismatch`, 'The new passwords do not match.'))
+
+    setPasswordState({ busy: true, error: null, field: null, success: '' })
+    try {
+      const data = getApiData(await api.post('/auth/password', { current_password: currentPassword, new_password: newPassword }))
+      applyCredentialResult(data)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setPasswordState({ busy: false, error: null, field: null, success: t(`${NS}.security.passwordUpdated`, 'Password updated. Other devices have been signed out.') })
+    } catch (err) {
+      const { field, message } = credentialError(err, t, 'security.errors.passwordFailed', 'Could not update your password.')
+      fail(field, message)
+    }
+  }
+
+  return (
+    <section className="surface mt-5 p-5 sm:p-7" aria-labelledby="account-security-title">
+      <div className="flex items-start gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/25 dark:text-primary-300">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 id="account-security-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {t(`${NS}.security.title`, 'Sign-in & security')}
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {t(`${NS}.security.subtitle`, 'Change the email and password you sign in with. Other devices are signed out after a change.')}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-2 lg:gap-8">
+        <form onSubmit={handleEmailSubmit} noValidate>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <Mail className="h-4 w-4 text-slate-400" /> {t(`${NS}.security.emailHeading`, 'Change email')}
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {t(`${NS}.security.currentEmail`, 'Current email: {{email}}', { email: user?.email || '—' })}
+          </p>
+
+          <label className={cn(fieldLabel, 'mt-4 block')} htmlFor="security-new-email">
+            {t(`${NS}.security.newEmail`, 'New email')}
+          </label>
+          <input
+            id="security-new-email"
+            type="email"
+            autoComplete="email"
+            className={cn(fieldInput, emailState.field === 'new_email' && 'border-rose-400 focus:border-rose-400 focus:ring-rose-100')}
+            value={emailForm.newEmail}
+            onChange={(e) => setEmailForm((current) => ({ ...current, newEmail: e.target.value }))}
+            aria-invalid={emailState.field === 'new_email' || undefined}
+          />
+
+          {hasPassword && (
+            <>
+              <label className={cn(fieldLabel, 'mt-4 block')} htmlFor="security-email-current">
+                {t(`${NS}.security.currentPassword`, 'Current password')}
+              </label>
+              <PasswordInput
+                id="security-email-current"
+                value={emailForm.currentPassword}
+                onChange={(value) => setEmailForm((current) => ({ ...current, currentPassword: value }))}
+                autoComplete="current-password"
+                invalid={emailState.field === 'current_password'}
+              />
+            </>
+          )}
+
+          <FormMessage error={emailState.error} success={emailState.success} />
+          <SubmitButton busy={emailState.busy} disabled={!emailForm.newEmail.trim()} icon={Mail}>
+            {emailState.busy ? t(`${NS}.saving`, 'Saving...') : t(`${NS}.security.updateEmail`, 'Update email')}
+          </SubmitButton>
+        </form>
+
+        <form onSubmit={handlePasswordSubmit} noValidate className="border-t border-slate-100 pt-6 dark:border-slate-800 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <KeyRound className="h-4 w-4 text-slate-400" />
+            {hasPassword ? t(`${NS}.security.passwordHeading`, 'Change password') : t(`${NS}.security.setPasswordHeading`, 'Set a password')}
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {hasPassword
+              ? t(`${NS}.security.passwordHint`, 'At least {{min}} characters.', { min: MIN_PASSWORD_LENGTH })
+              : t(`${NS}.security.setPasswordHint`, 'You sign in with Google. Add a password to also sign in with your email.')}
+          </p>
+
+          {hasPassword && (
+            <>
+              <label className={cn(fieldLabel, 'mt-4 block')} htmlFor="security-current-password">
+                {t(`${NS}.security.currentPassword`, 'Current password')}
+              </label>
+              <PasswordInput
+                id="security-current-password"
+                value={passwordForm.currentPassword}
+                onChange={(value) => setPasswordForm((current) => ({ ...current, currentPassword: value }))}
+                autoComplete="current-password"
+                invalid={passwordState.field === 'current_password'}
+              />
+            </>
+          )}
+
+          <label className={cn(fieldLabel, 'mt-4 block')} htmlFor="security-new-password">
+            {t(`${NS}.security.newPassword`, 'New password')}
+          </label>
+          <PasswordInput
+            id="security-new-password"
+            value={passwordForm.newPassword}
+            onChange={(value) => setPasswordForm((current) => ({ ...current, newPassword: value }))}
+            autoComplete="new-password"
+            invalid={passwordState.field === 'new_password'}
+          />
+
+          <label className={cn(fieldLabel, 'mt-4 block')} htmlFor="security-confirm-password">
+            {t(`${NS}.security.confirmPassword`, 'Confirm new password')}
+          </label>
+          <PasswordInput
+            id="security-confirm-password"
+            value={passwordForm.confirmPassword}
+            onChange={(value) => setPasswordForm((current) => ({ ...current, confirmPassword: value }))}
+            autoComplete="new-password"
+            invalid={passwordState.field === 'confirm_password'}
+          />
+
+          <FormMessage error={passwordState.error} success={passwordState.success} />
+          <SubmitButton busy={passwordState.busy} disabled={!passwordForm.newPassword} icon={KeyRound}>
+            {passwordState.busy
+              ? t(`${NS}.saving`, 'Saving...')
+              : hasPassword ? t(`${NS}.security.updatePassword`, 'Update password') : t(`${NS}.security.setPassword`, 'Set password')}
+          </SubmitButton>
+        </form>
+      </div>
+    </section>
   )
 }

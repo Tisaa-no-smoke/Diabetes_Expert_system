@@ -70,6 +70,18 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // The tokens may have been replaced while this request was in flight
+    // (e.g. a password or email change revokes older sessions and hands this
+    // tab new ones). Retry with the current token instead of refreshing with
+    // a refresh token the server has already invalidated.
+    const sentToken = String(originalRequest.headers?.Authorization || '').replace(/^Bearer /, '')
+    const currentToken = getAccessToken()
+    if (currentToken && sentToken && currentToken !== sentToken) {
+      originalRequest._retry = true
+      originalRequest.headers.Authorization = `Bearer ${currentToken}`
+      return api(originalRequest)
+    }
+
     const refreshToken = getRefreshToken()
     if (!refreshToken) {
       clearAuthStorage()
@@ -97,6 +109,11 @@ api.interceptors.response.use(
 
       return api(originalRequest)
     } catch (refreshError) {
+      // Same race as above, detected after the refresh attempt.
+      if (getRefreshToken() && getRefreshToken() !== refreshToken && getAccessToken()) {
+        originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`
+        return api(originalRequest)
+      }
       clearAuthStorage()
       return Promise.reject(refreshError)
     } finally {

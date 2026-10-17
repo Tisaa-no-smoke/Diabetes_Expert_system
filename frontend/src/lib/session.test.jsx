@@ -74,3 +74,20 @@ it('uses custom-role translation fallbacks in both languages', () => {
     expect(translate(language, 'roles.browser_reader', { defaultValue: 'Browser Reader' })).toBe('Browser Reader')
   }
 })
+
+it('retries with tokens replaced mid-flight instead of signing out', async () => {
+  setAuthTokens('pre-change-access', 'pre-change-refresh')
+  const refresh = vi.spyOn(axios, 'post')
+  api.defaults.adapter = async (config) => {
+    if (config.headers.Authorization === 'Bearer pre-change-access') {
+      // A credential change completes while this request is in flight.
+      setAuthTokens('post-change-access', 'post-change-refresh')
+      throw { config, response: { status: 401 } }
+    }
+    expect(config.headers.Authorization).toBe('Bearer post-change-access')
+    return { data: { success: true }, status: 200, config, headers: {} }
+  }
+  await api.get('/notifications')
+  expect(refresh).not.toHaveBeenCalled()
+  expect(localStorage.getItem('access_token') || localStorage.getItem('token')).toBe('post-change-access')
+})

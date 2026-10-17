@@ -747,7 +747,42 @@
     "saved": "Saved",
     "saveSuccess": "Profile updated successfully.",
     "staffNote": "You are signed in as staff — the health profile section is only shown for patient accounts.",
-    "loadFailed": "Could not load your health profile."
+    "loadFailed": "Could not load your health profile.",
+    "security": {
+      "emailHint": "Change it under Sign-in & security below.",
+      "hidePassword": "Hide password",
+      "showPassword": "Show password",
+      "errors": {
+        "emailInvalid": "Enter a valid email address.",
+        "emailSame": "This is already your email.",
+        "currentRequired": "Enter your current password.",
+        "passwordShort": "Use at least {{min}} characters.",
+        "passwordLong": "Use at most {{max}} characters.",
+        "passwordSame": "Choose a password different from your current one.",
+        "passwordMismatch": "The new passwords do not match.",
+        "currentIncorrect": "Current password is incorrect.",
+        "emailInUse": "That email is already used by another account.",
+        "emailFailed": "Could not update your email.",
+        "passwordFailed": "Could not update your password."
+      },
+      "emailUpdated": "Email updated. Use it the next time you sign in.",
+      "passwordUpdated": "Password updated. Other devices have been signed out.",
+      "title": "Sign-in & security",
+      "subtitle": "Change the email and password you sign in with. Other devices are signed out after a change.",
+      "emailHeading": "Change email",
+      "currentEmail": "Current email: {{email}}",
+      "newEmail": "New email",
+      "currentPassword": "Current password",
+      "updateEmail": "Update email",
+      "passwordHeading": "Change password",
+      "setPasswordHeading": "Set a password",
+      "passwordHint": "At least {{min}} characters.",
+      "setPasswordHint": "You sign in with Google. Add a password to also sign in with your email.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "updatePassword": "Update password",
+      "setPassword": "Set password"
+    }
   },
   "patientDashboard": {
     "errors": {

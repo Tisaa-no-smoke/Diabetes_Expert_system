@@ -171,3 +171,58 @@ test('clinician signs a review with treatment guidance and the patient is notifi
     expect.objectContaining({ type: 'review', message: expect.stringContaining('Dr. Lina') }),
   ]))
 })
+
+test('a user changes their password and email from the profile page', async ({ page }) => {
+  const apiBase = 'http://127.0.0.1:5002/api'
+  const registered = await page.request.post(`${apiBase}/auth/register`, {
+    data: { name: 'Credential Tester', email: 'credentials@example.com', password: 'original-pass-1' },
+  })
+  expect(registered.ok()).toBeTruthy()
+  const { access_token: token } = (await registered.json()).data
+  await page.request.patch(`${apiBase}/patients/mine`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { gender: 'female', date_of_birth: '1992-02-02', profile_complete: true },
+  })
+
+  await page.addInitScript(() => localStorage.setItem('app-language', 'en'))
+  await page.goto('/login')
+  await page.locator('#email').fill('credentials@example.com')
+  await page.locator('#password').fill('original-pass-1')
+  await page.locator('button[type="submit"]').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await page.goto('/profile')
+
+  // A wrong current password is a form error; the session survives it.
+  await page.locator('#security-current-password').fill('wrong-password-9')
+  await page.locator('#security-new-password').fill('changed-pass-22')
+  await page.locator('#security-confirm-password').fill('changed-pass-22')
+  await page.getByRole('button', { name: 'Update password', exact: true }).click()
+  await expect(page.getByText('Current password is incorrect.')).toBeVisible()
+  await expect(page).toHaveURL(/\/profile$/)
+
+  await page.locator('#security-current-password').fill('original-pass-1')
+  await page.getByRole('button', { name: 'Update password', exact: true }).click()
+  await expect(page.getByText('Password updated. Other devices have been signed out.')).toBeVisible()
+
+  await page.locator('#security-new-email').fill('credentials-new@example.com')
+  await page.locator('#security-email-current').fill('changed-pass-22')
+  await page.getByRole('button', { name: 'Update email', exact: true }).click()
+  await expect(page.getByText('Email updated. Use it the next time you sign in.')).toBeVisible()
+
+  // This tab keeps its session across both changes.
+  await page.reload()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.locator('main')).toContainText('credentials-new@example.com')
+
+  await page.getByRole('button', { name: 'User menu', exact: true }).last().click()
+  await page.getByText('Log out', { exact: true }).last().click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.locator('#email').fill('credentials-new@example.com')
+  await page.locator('#password').fill('changed-pass-22')
+  await page.locator('button[type="submit"]').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+
+  // The old registration token was issued before the changes and is now rejected.
+  const stale = await page.request.get(`${apiBase}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(stale.status()).toBe(401)
+})

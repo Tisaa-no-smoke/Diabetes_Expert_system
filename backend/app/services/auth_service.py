@@ -50,6 +50,8 @@ def _get_google_auth_request():
 class AuthService:
     ACCESS_TOKEN_TYPE = "access"
     REFRESH_TOKEN_TYPE = "refresh"
+    MIN_PASSWORD_LENGTH = 8
+    MAX_PASSWORD_LENGTH = 128
 
     def __init__(
         self,
@@ -405,6 +407,92 @@ class AuthService:
             "expires_in": self.access_token_expires_seconds,
         }
 
+    def change_password(self, user_id: int, *, current_password: str, new_password: str) -> dict:
+        """Change (or, for Google-only accounts, set) the signed-in user's password."""
+        user = self._get_active_user(user_id)
+        self._verify_current_password(user, current_password)
+
+        new_password = str(new_password or "")
+        if len(new_password) < self.MIN_PASSWORD_LENGTH:
+            raise ValidationError(
+                f"New password must be at least {self.MIN_PASSWORD_LENGTH} characters.",
+                details={"field": "new_password"},
+            )
+        if len(new_password) > self.MAX_PASSWORD_LENGTH:
+            raise ValidationError(
+                f"New password must be at most {self.MAX_PASSWORD_LENGTH} characters.",
+                details={"field": "new_password"},
+            )
+        if user.password_hash and check_password_hash(user.password_hash, new_password):
+            raise ValidationError(
+                "New password must be different from the current password.",
+                details={"field": "new_password"},
+            )
+
+        had_password = bool(user.password_hash)
+        user.password_hash = generate_password_hash(new_password)
+        return self._finish_credential_change(
+            user,
+            action="auth.password_change" if had_password else "auth.password_set",
+            metadata={},
+        )
+
+    def change_email(self, user_id: int, *, current_password: str, new_email: str) -> dict:
+        """Change the signed-in user's sign-in email."""
+        user = self._get_active_user(user_id)
+        self._verify_current_password(user, current_password)
+
+        email = str(new_email or "").strip().lower()
+        local, _, domain = email.partition("@")
+        if not local or "." not in domain or " " in email or len(email) > 255:
+            raise ValidationError("A valid email is required.", details={"field": "new_email"})
+        if email == (user.email or "").lower():
+            raise ValidationError("This is already your email.", details={"field": "new_email"})
+        existing = self.user_repository.get_by_email_case_insensitive(email)
+        if existing and existing.id != user.id:
+            raise ValidationError("Email is already in use.", details={"field": "new_email"})
+
+        previous_email = user.email
+        user.email = email
+        return self._finish_credential_change(
+            user,
+            action="auth.email_change",
+            metadata={"previous_email": previous_email, "email": email},
+        )
+
+    def _get_active_user(self, user_id):
+        user = self.user_repository.get_by_id(user_id)
+        if not user or not user.is_active:
+            raise UnauthorizedError("User account is inactive.")
+        return user
+
+    @staticmethod
+    def _verify_current_password(user, current_password: str) -> None:
+        # A wrong current password is a form error (400), not an expired
+        # session (401): the client signs the user out on 401.
+        if not user.password_hash:
+            return
+        if not current_password or not check_password_hash(user.password_hash, str(current_password)):
+            raise ValidationError("Current password is incorrect.", details={"field": "current_password"})
+
+    def _finish_credential_change(self, user, *, action: str, metadata: dict) -> dict:
+        # Whole seconds: token "iat" claims are whole seconds, and tokens
+        # issued right after this change must stay valid.
+        user.credentials_changed_at = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+        db.session.commit()
+
+        if self.audit_log_repository:
+            self.audit_log_repository.create(
+                action=action,
+                entity_type="user",
+                entity_id=str(user.id),
+                actor_user_id=user.id,
+                metadata=metadata,
+            )
+
+        public_user = self.user_repository.to_public_dict(user)
+        return {**self.issue_tokens(public_user), "user": public_user}
+
     def decode_access_token(self, token: str) -> dict:
         return self.decode_token(token, expected_type=self.ACCESS_TOKEN_TYPE)
 
@@ -449,6 +537,11 @@ class AuthService:
             user = self.user_repository.get_by_id(int(user_id)) if user_id else None
             if not user or not user.is_active:
                 raise UnauthorizedError("User account is inactive.")
+            changed_at = user.credentials_changed_at
+            if changed_at is not None:
+                changed_ts = int(changed_at.replace(tzinfo=UTC).timestamp())
+                if int(payload.get("iat") or 0) < changed_ts:
+                    raise UnauthorizedError("Your sign-in details changed. Please sign in again.")
 
         return payload
 

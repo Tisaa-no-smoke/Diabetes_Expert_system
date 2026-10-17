@@ -67,6 +67,9 @@ class User(db.Model):
     hospital_affiliation = db.Column(db.String(255), nullable=True)
     license_number = db.Column(db.String(80), nullable=True)
     bio = db.Column(db.Text, nullable=True)
+    # Tokens issued before this moment are rejected, so changing the password
+    # or email signs the account out everywhere else.
+    credentials_changed_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now, index=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)

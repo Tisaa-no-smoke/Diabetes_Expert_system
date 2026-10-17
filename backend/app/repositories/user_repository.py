@@ -329,6 +329,9 @@ class UserRepository:
             "license_number": getattr(user, "license_number", None),
             "bio": getattr(user, "bio", None),
             "is_active": user.is_active,
+            # Google-only accounts have no password; they set a first one
+            # without supplying a current password.
+            "has_password": bool(user.password_hash),
             "roles": role_names,
             "role": role_names[0] if role_names else "patient",
             "permissions": permissions,
