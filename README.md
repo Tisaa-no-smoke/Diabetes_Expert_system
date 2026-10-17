@@ -79,6 +79,36 @@ A professional, full-stack web application designed to leverage an expert system
 
 ---
 
+## 🧭 Two Ways to Try It
+
+**1. Live demo — the patient experience.** Sign up on the hosted site
+(_link coming soon_) with any email. Every new account is a **patient**: you can
+take a diabetes risk assessment, read your result, and follow your care plan.
+Administrator and doctor accounts on the live site are private, so the
+knowledge base and access settings stay accurate for everyone.
+
+**2. Full system — run your own copy.** To explore the doctor workspace, the
+rule editor, and the admin panel, clone the project and run it on your computer.
+Your copy uses its own local database and creates the demo admin, doctor, and
+patient accounts listed [below](#-demo-accounts-local-copies). Anything you
+change only affects your copy.
+
+macOS / Linux (needs Python 3.11+ and Node.js 20+):
+
+```bash
+git clone https://github.com/Tisaa-no-smoke/Diabetes_Expert_system.git
+cd Diabetes_Expert_system
+./run.sh
+```
+
+The first start installs dependencies, then open <http://localhost:5173>.
+On Windows, follow the [Windows quick start](#windows-local-quick-start-sqlite).
+PDF report export also needs WeasyPrint's system libraries
+([install guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation));
+everything else works without them.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -178,7 +208,7 @@ and Docker Compose.
 
 ---
 
-## 🔑 Demo Accounts (If Seeded)
+## 🔑 Demo Accounts (Local Copies)
 
 The default knowledge base is the expanded **v3** set (59 rules and 99 catalog
 facts). It includes two-test confirmation, random glucose with classic
@@ -208,6 +238,15 @@ If you enabled `SEED_DEMO_DATA=true` in your backend environment, the following 
 | Admin       | admin@example.com      | `admin123`   |
 | Doctor      | doctor@example.com     | `doctor123`  |
 | Patient     | patient@example.com    | `patient123` |
+
+These passwords are public, so never enable demo seeding on a public
+deployment. On a server, set `SEED_DEMO_DATA=false` and `DB_AUTO_CREATE=false`,
+and replace the password of any account that already exists:
+
+```bash
+cd backend
+flask --app run.py set-password admin@example.com   # prompts, input hidden
+```
 
 ---
 

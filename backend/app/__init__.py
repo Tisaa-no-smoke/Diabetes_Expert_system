@@ -93,6 +93,24 @@ def _register_cli_commands(app: Flask):
         db.session.commit()
         app.logger.info("Cleaned up %d expired revoked tokens.", deleted)
 
+    @app.cli.command("set-password")
+    @click.argument("email")
+    @click.password_option(prompt="New password", confirmation_prompt="Repeat password")
+    def set_password_command(email, password):
+        """Set a user's password (e.g. to lock down seeded demo accounts)."""
+        from werkzeug.security import generate_password_hash
+
+        from .models import User
+
+        if len(password) < 10:
+            raise click.ClickException("Password must be at least 10 characters.")
+        user = User.query.filter(db.func.lower(User.email) == email.strip().lower()).first()
+        if not user:
+            raise click.ClickException(f"No user with email {email}.")
+        user.password_hash = generate_password_hash(password)
+        db.session.commit()
+        click.echo(f"Password updated for {user.email}.")
+
     @app.cli.command("seed-db")
     def seed_db():
         """Seed the database with medical rules, roles, and demo users."""
