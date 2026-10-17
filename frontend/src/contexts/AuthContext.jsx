@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api, { AUTH_CLEARED_EVENT, clearAuthStorage, getAccessToken, getApiData, getRefreshToken, setAuthTokens } from '../api/client'
 
 const AuthContext = createContext(null)
@@ -16,12 +16,23 @@ function readStoredUser() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => readStoredUser())
+  const [user, setUserState] = useState(() => readStoredUser())
+
+  // Persist a directly-set user before React re-renders: callers navigate
+  // right after signing in, and a reload in that gap would otherwise find the
+  // tokens without the user and fall back to the login page.
+  const setUser = useCallback((next) => {
+    if (typeof next !== 'function') {
+      if (next) localStorage.setItem('user', JSON.stringify(next))
+      else localStorage.removeItem('user')
+    }
+    setUserState(next)
+  }, [])
 
   useEffect(() => {
-    const onAuthCleared = () => setUser(null)
+    const onAuthCleared = () => setUserState(null)
     const onStorage = (event) => {
-      if (event.key === 'user' || event.key === null) setUser(readStoredUser())
+      if (event.key === 'user' || event.key === null) setUserState(readStoredUser())
     }
     window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared)
     window.addEventListener('storage', onStorage)
@@ -105,7 +116,7 @@ export function AuthProvider({ children }) {
     logout,
     refreshUser,
     loginWithGoogle,
-  }), [user])
+  }), [user, setUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

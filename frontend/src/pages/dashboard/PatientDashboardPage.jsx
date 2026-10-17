@@ -1433,7 +1433,7 @@ export function PatientDashboardPage() {
 
                 {healthTrendData.length > 0 ? (
                   <div className="mt-4 h-56 sm:h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
                       <AreaChart data={healthTrendData} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="healthMainGradient" x1="0" y1="0" x2="0" y2="1">
@@ -1567,7 +1567,7 @@ export function PatientDashboardPage() {
                 {/* Radar Chart or Clean Empty State */}
                 {radarMetrics.hasData ? (
                   <div className="h-52 w-full mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
                       <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarMetrics.data}>
                         <PolarGrid stroke="#e2e8f0" strokeOpacity={0.6} />
                         <PolarAngleAxis

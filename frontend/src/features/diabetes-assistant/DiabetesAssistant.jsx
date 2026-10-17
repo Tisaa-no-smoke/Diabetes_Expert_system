@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react'
 import {
   ArrowLeft,
   Bot,
@@ -14,9 +14,12 @@ import {
 } from 'lucide-react'
 import { ASSISTANT_COPY, DIABETES_QUESTIONS } from './diabetesQuestions'
 import { FormattedMessage } from './FormattedMessage'
-import { DrBot3D } from './DrBot3D'
+import { lazyWithRetry } from '@/lib/lazyWithRetry'
 import { useLanguage } from '@/contexts/LanguageContext'
 import './DiabetesAssistant.css'
+
+// three.js is large; loading the mascot on demand keeps it out of the entry bundle.
+const DrBot3D = lazyWithRetry(() => import('./DrBot3D').then((module) => ({ default: module.DrBot3D })))
 
 const STORAGE_KEY = 'diabetes-assistant-conversation:v5'
 const PANEL_PLACEMENT_STORAGE_KEY = 'diabetes-assistant-placement:v1'
@@ -1311,7 +1314,9 @@ export function DiabetesAssistant() {
         )}
 
         <div className="relative flex h-[88px] w-[78px] items-center justify-center pointer-events-none">
-          <DrBot3D className="h-full w-full" modelUrl="/3d/dr-bot.glb" />
+          <Suspense fallback={null}>
+            <DrBot3D className="h-full w-full" modelUrl="/3d/dr-bot.glb" />
+          </Suspense>
         </div>
       </button>
     </div>

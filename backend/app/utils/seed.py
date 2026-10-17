@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from flask import current_app
 
@@ -6,6 +7,7 @@ from werkzeug.security import generate_password_hash
 
 from app.extensions import db
 from app.models import Fact, Notification, Permission, Patient, Role, Rule, RuleAction, RuleCategory, RuleCondition, RuleVersion, User
+from app.models.entities import utc_now
 from app.utils.diabetes_rule_seed_data import DIABETES_RULE_SEED
 from app.utils.diabetes_rule_seed_data_v2 import DIABETES_RULE_SEED_V2
 from app.utils.diabetes_rule_seed_data_v3 import DIABETES_RULE_SEED_V3, V3_PREVIOUS_DEFINITIONS
@@ -448,6 +450,17 @@ def _seed_patient_profile() -> None:
                 full_name=patient_user.name,
                 gender="male",
                 notes="Demo patient profile",
+                # A complete health profile lets the demo patient sign straight
+                # into the dashboard instead of the first-run profile setup.
+                date_of_birth=date(1990, 6, 8),
+                height_cm=172.0,
+                weight_kg=78.0,
+                smoking=False,
+                sedentary_lifestyle=True,
+                family_history=True,
+                hypertension=False,
+                high_cholesterol=False,
+                profile_completed_at=utc_now(),
             )
         )
 

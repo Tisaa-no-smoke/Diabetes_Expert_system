@@ -59,7 +59,7 @@ export function DrBot3D({
     let scene = null
     let camera = null
     let modelInstance = null
-    const clock = new THREE.Clock()
+    const clock = new THREE.Timer()
 
     // 1. Scene setup
     scene = new THREE.Scene()
@@ -136,7 +136,8 @@ export function DrBot3D({
           if (isDestroyed) return
           animationFrameId = requestAnimationFrame(animate)
 
-          const elapsed = clock.getElapsedTime()
+          clock.update()
+          const elapsed = clock.getElapsed()
 
           if (idleAnimation && rootGroup) {
             // Gentle hovering bob
@@ -200,6 +201,7 @@ export function DrBot3D({
       window.removeEventListener('pointermove', handlePointerMove)
       resizeObserver.disconnect()
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
+      clock.dispose()
 
       if (renderer) {
         renderer.dispose()
