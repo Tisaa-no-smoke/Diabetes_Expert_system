@@ -12,6 +12,9 @@ __pycache__/
 # Local databases
 *.db
 
+# User uploads (profile photos) are personal data, never source code
+backend/instance/uploads/
+
 # Virtual environments
 .venv/
 backend/.venv/

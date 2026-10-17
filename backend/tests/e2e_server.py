@@ -31,6 +31,9 @@ if __name__ == '__main__':
             GOOGLE_CLIENT_ID = None
 
         app = create_app(BrowserTestConfig)
+        # Uploaded files (profile photos) go under the instance folder; keep
+        # them in the disposable directory instead of backend/instance.
+        app.instance_path = directory
         logging.getLogger('werkzeug').setLevel(logging.WARNING)
         with app.app_context():
             role = Role(name='observer', description='Read-only patient records')
