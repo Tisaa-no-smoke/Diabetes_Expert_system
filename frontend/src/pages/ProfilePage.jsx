@@ -18,6 +18,7 @@ import api, { getApiData, getApiErrorMessage, setAuthTokens } from '@/api/client
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { FormSkeleton, UserAvatar } from '@/components/ui'
+import { AvatarCropDialog } from '@/components/profile/AvatarCropDialog'
 import { cn } from '@/lib/utils'
 
 /*
@@ -179,30 +180,40 @@ export function ProfilePage() {
   const [avatarError, setAvatarError] = useState('')
   const [avatarSuccess, setAvatarSuccess] = useState('')
   const avatarTimer = useRef(null)
+  // Object URL of the photo being cropped; the crop dialog is open while set.
+  const [cropSource, setCropSource] = useState(null)
 
-  async function handleAvatarFileSelect(e) {
+  useEffect(() => () => {
+    if (cropSource) URL.revokeObjectURL(cropSource)
+  }, [cropSource])
+
+  function handleAvatarFileSelect(e) {
     const file = e.target.files?.[0]
+    // Reset so choosing the same file again still opens the cropper.
+    if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file) return
 
     setAvatarError('')
     setAvatarSuccess('')
 
-    // Validate size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError(t(`${NS}.photoErrorSize`, 'Image size exceeds 5MB. Please choose a smaller photo.'))
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    // The original never leaves the browser: it is cropped and re-encoded to a
+    // small square JPEG first, so a large phone photo is fine here.
+    if (file.size > 15 * 1024 * 1024) {
+      setAvatarError(t(`${NS}.photoErrorSize`, 'Image size exceeds 15MB. Please choose a smaller photo.'))
       return
     }
 
-    // Validate type
     if (!file.type.startsWith('image/')) {
       setAvatarError(t(`${NS}.photoErrorType`, 'Please select a valid image file (PNG, JPG, WEBP, GIF).'))
-      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
+    setCropSource(URL.createObjectURL(file))
+  }
+
+  async function uploadCroppedAvatar(blob) {
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', blob, 'avatar.jpg')
 
     setUploadingAvatar(true)
     try {
@@ -219,10 +230,10 @@ export function ProfilePage() {
       if (avatarTimer.current) clearTimeout(avatarTimer.current)
       avatarTimer.current = setTimeout(() => setAvatarSuccess(''), 3000)
     } catch (err) {
-      setAvatarError(getApiErrorMessage(err, 'Failed to upload profile picture.'))
+      setAvatarError(getApiErrorMessage(err, t(`${NS}.photoUploadFailed`, 'Failed to upload profile picture.')))
     } finally {
       setUploadingAvatar(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setCropSource(null)
     }
   }
 
@@ -480,7 +491,7 @@ export function ProfilePage() {
               )}
 
               <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                {t(`${NS}.photoHint`, 'PNG, JPG, WEBP or GIF up to 5MB')}
+                {t(`${NS}.photoHint`, 'PNG, JPG, WEBP or GIF up to 15MB')}
               </span>
             </div>
 
@@ -696,6 +707,15 @@ export function ProfilePage() {
       </form>
 
       <AccountSecurityCard />
+
+      {cropSource && (
+        <AvatarCropDialog
+          imageSrc={cropSource}
+          busy={uploadingAvatar}
+          onCancel={() => setCropSource(null)}
+          onConfirm={uploadCroppedAvatar}
+        />
+      )}
 
       {/* ── 4. Health Profile (Patients Only) ── */}
       {isPatient ? (

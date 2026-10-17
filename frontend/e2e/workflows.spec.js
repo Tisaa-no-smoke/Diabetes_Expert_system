@@ -1,3 +1,4 @@
+import { deflateSync } from 'node:zlib'
 import { test, expect } from '@playwright/test'
 
 const routes = {
@@ -225,4 +226,90 @@ test('a user changes their password and email from the profile page', async ({ p
   // The old registration token was issued before the changes and is now rejected.
   const stale = await page.request.get(`${apiBase}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
   expect(stale.status()).toBe(401)
+})
+
+/** A width x height PNG, blue on the left half and orange on the right. */
+function makeTwoTonePng(width, height) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const crc32 = (buffer) => {
+    let c = 0xffffffff
+    for (const byte of buffer) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+  }
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header.set([8, 2, 0, 0, 0], 8) // 8-bit RGB
+  const rows = []
+  for (let y = 0; y < height; y++) {
+    const row = Buffer.alloc(1 + width * 3)
+    for (let x = 0; x < width; x++) row.set(x < width / 2 ? [37, 99, 235] : [249, 115, 22], 1 + x * 3)
+    rows.push(row)
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.concat(rows))),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+test('a profile photo is positioned and cropped before it is uploaded', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('app-language', 'en'))
+  await login(page, 'doctor')
+  await page.goto('/profile')
+
+  const uploads = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/auth/avatar')) uploads.push(request)
+  })
+  const photo = { name: 'wide-photo.png', mimeType: 'image/png', buffer: makeTwoTonePng(640, 400) }
+  const fileInput = page.locator('input[type="file"]')
+  const dialog = page.getByRole('dialog', { name: 'Adjust your photo' })
+
+  // Cancelling uploads nothing.
+  await fileInput.setInputFiles(photo)
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  expect(uploads).toHaveLength(0)
+
+  // Choosing the same file again reopens the cropper.
+  await fileInput.setInputFiles(photo)
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click()
+  await expect(dialog.getByRole('slider', { name: 'Zoom' })).toHaveValue('1.4')
+  await dialog.getByRole('button', { name: 'Rotate right', exact: true }).click()
+
+  const uploaded = page.waitForResponse((response) => response.url().endsWith('/api/auth/avatar') && response.request().method() === 'POST')
+  await dialog.getByRole('button', { name: 'Save photo', exact: true }).click()
+  const response = await uploaded
+  expect(response.status()).toBe(200)
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Profile picture updated successfully.')).toBeVisible()
+
+  // The stored photo is the square crop, not the 640x400 original.
+  expect(uploads).toHaveLength(1)
+  const { avatar_url: avatarUrl } = (await response.json()).data
+  const size = await page.evaluate(async (src) => {
+    const image = new Image()
+    image.src = src
+    await image.decode()
+    return { width: image.naturalWidth, height: image.naturalHeight }
+  }, `http://127.0.0.1:5002${avatarUrl}`)
+  expect(size.width).toBe(size.height)
+  expect(size.width).toBeLessThanOrEqual(512)
 })

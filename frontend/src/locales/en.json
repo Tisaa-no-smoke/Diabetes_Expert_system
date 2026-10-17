@@ -737,8 +737,8 @@
     "uploadPhoto": "Upload photo",
     "uploadingPhoto": "Uploading...",
     "removePhoto": "Remove photo",
-    "photoHint": "PNG, JPG, WEBP or GIF up to 5MB",
-    "photoErrorSize": "Image size exceeds 5MB. Please choose a smaller photo.",
+    "photoHint": "PNG, JPG, WEBP or GIF up to 15MB",
+    "photoErrorSize": "Image size exceeds 15MB. Please choose a smaller photo.",
     "photoErrorType": "Please select a valid image file (PNG, JPG, WEBP, GIF).",
     "photoUploadSuccess": "Profile picture updated successfully.",
     "photoRemoveSuccess": "Profile picture removed.",
@@ -782,6 +782,21 @@
       "confirmPassword": "Confirm new password",
       "updatePassword": "Update password",
       "setPassword": "Set password"
+    },
+    "photoUploadFailed": "Failed to upload profile picture.",
+    "photoCrop": {
+      "title": "Adjust your photo",
+      "hint": "Drag to move the photo. Zoom with the slider, mouse wheel, or a pinch.",
+      "zoom": "Zoom",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "rotateLeft": "Rotate left",
+      "rotateRight": "Rotate right",
+      "reset": "Reset",
+      "cancel": "Cancel",
+      "save": "Save photo",
+      "saving": "Saving...",
+      "error": "This photo could not be processed. Please try another image."
     }
   },
   "patientDashboard": {
