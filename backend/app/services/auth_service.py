@@ -52,7 +52,8 @@ def _get_google_auth_request():
 class AuthService:
     ACCESS_TOKEN_TYPE = "access"
     REFRESH_TOKEN_TYPE = "refresh"
-    UPLOADED_AVATAR_URL = re.compile(r"/api/auth/avatar/avatar_\d+_\d+_[0-9a-f]{8}\.(?:png|jpe?g|webp|gif)")
+    UPLOADED_AVATAR_FILENAME = re.compile(r"avatar_\d+_\d+_[0-9a-f]{8}\.(?:png|jpe?g|webp|gif)")
+    UPLOADED_AVATAR_URL = re.compile(r"/api/auth/avatar/" + UPLOADED_AVATAR_FILENAME.pattern)
     # Mirrors the users table column sizes so oversized input is a form error.
     PROFILE_FIELD_MAX_LENGTHS = {
         "phone": 40,
@@ -583,9 +584,9 @@ class AuthService:
 
     @staticmethod
     def get_avatar_dir() -> Path:
-        avatar_dir = Path(current_app.instance_path) / "uploads" / "avatars"
-        avatar_dir.mkdir(parents=True, exist_ok=True)
-        return avatar_dir
+        # Legacy location of pre-database photos. Not created here: serverless
+        # hosts have a read-only filesystem.
+        return Path(current_app.instance_path) / "uploads" / "avatars"
 
     def update_profile(self, user_id: int, payload: dict) -> dict:
         if not isinstance(payload, dict):
@@ -639,29 +640,55 @@ class AuthService:
 
         return public_user
 
-    def save_avatar(self, user_id: int, file) -> dict:
+    # The browser crops photos to at most 512x512 before uploading, so real
+    # uploads are a few hundred KB; this only stops abuse.
+    MAX_AVATAR_BYTES = 2 * 1024 * 1024
+    AVATAR_FORMATS = {
+        "JPEG": (".jpg", "image/jpeg"),
+        "PNG": (".png", "image/png"),
+        "WEBP": (".webp", "image/webp"),
+        "GIF": (".gif", "image/gif"),
+    }
+
+    @classmethod
+    def _read_avatar_image(cls, file) -> tuple[bytes, str, str]:
+        """Return (bytes, extension, content type) for a genuine image upload."""
         if not file or not file.filename:
             raise ValidationError("No image file provided.")
+        data = file.read(cls.MAX_AVATAR_BYTES + 1)
+        if len(data) > cls.MAX_AVATAR_BYTES:
+            raise ValidationError("Image is larger than 2 MB.")
+        try:
+            from io import BytesIO
 
-        allowed_extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-        original_ext = Path(file.filename).suffix.lower()
-        if original_ext not in allowed_extensions:
-            raise ValidationError(f"Invalid image format '{original_ext}'. Allowed formats: PNG, JPG, JPEG, WEBP, GIF.")
+            from PIL import Image
+
+            with Image.open(BytesIO(data)) as image:
+                image_format = image.format
+                image.verify()
+        except Exception:
+            raise ValidationError("The file is not a valid image.")
+        if image_format not in cls.AVATAR_FORMATS:
+            raise ValidationError("Allowed image formats: PNG, JPG, WEBP, GIF.")
+        extension, content_type = cls.AVATAR_FORMATS[image_format]
+        return data, extension, content_type
+
+    def save_avatar(self, user_id: int, file) -> dict:
+        data, extension, content_type = self._read_avatar_image(file)
 
         user = self.user_repository.get_by_id(user_id)
         if not user:
             raise NotFoundError("User not found.")
 
-        # Clean old local avatar file if exists
-        self._remove_local_avatar_file(user.avatar_url, user_id)
+        from app.models import UserAvatar
 
-        avatar_dir = self.get_avatar_dir()
-        filename = f"avatar_{user_id}_{int(time.time())}_{uuid4().hex[:8]}{original_ext}"
-        target_path = avatar_dir / filename
-        file.save(str(target_path))
-
-        avatar_url = f"/api/auth/avatar/{filename}"
-        updated_user = self.user_repository.update_profile(user, {"avatar_url": avatar_url})
+        previous_url = user.avatar_url
+        filename = f"avatar_{user_id}_{int(time.time())}_{uuid4().hex[:8]}{extension}"
+        # Photos live in the database so every server instance can serve them.
+        UserAvatar.query.filter_by(user_id=user_id).delete()
+        db.session.add(UserAvatar(user_id=user_id, filename=filename, content_type=content_type, data=data))
+        updated_user = self.user_repository.update_profile(user, {"avatar_url": f"/api/auth/avatar/{filename}"})
+        self._remove_local_avatar_file(previous_url, user_id)
         return self.user_repository.to_public_dict(updated_user)
 
     def delete_avatar(self, user_id: int) -> dict:
@@ -669,11 +696,41 @@ class AuthService:
         if not user:
             raise NotFoundError("User not found.")
 
-        self._remove_local_avatar_file(user.avatar_url, user_id)
+        from app.models import UserAvatar
+
+        previous_url = user.avatar_url
+        UserAvatar.query.filter_by(user_id=user_id).delete()
         updated_user = self.user_repository.update_profile(user, {"avatar_url": None})
+        self._remove_local_avatar_file(previous_url, user_id)
         return self.user_repository.to_public_dict(updated_user)
 
+    def get_avatar(self, filename: str):
+        """Return (bytes, content type) for a stored photo, or None.
+
+        Photos uploaded before database storage are still read from the local
+        uploads folder when it exists.
+        """
+        if not self.UPLOADED_AVATAR_FILENAME.fullmatch(filename or ""):
+            return None
+        from app.models import UserAvatar
+
+        avatar = UserAvatar.query.filter_by(filename=filename).first()
+        if avatar:
+            return avatar.data, avatar.content_type
+        legacy = Path(current_app.instance_path) / "uploads" / "avatars" / filename
+        try:
+            if legacy.is_file():
+                extension = legacy.suffix.lower()
+                content_type = next((ct for ext, ct in self.AVATAR_FORMATS.values() if ext == extension), "image/jpeg")
+                if extension == ".jpeg":
+                    content_type = "image/jpeg"
+                return legacy.read_bytes(), content_type
+        except OSError:
+            pass
+        return None
+
     def _remove_local_avatar_file(self, avatar_url: str | None, user_id: int):
+        """Delete a pre-database photo file from local disk, if there is one."""
         if not avatar_url or not avatar_url.startswith("/api/auth/avatar/"):
             return
         filename = avatar_url.removeprefix("/api/auth/avatar/")

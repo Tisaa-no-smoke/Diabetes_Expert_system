@@ -386,6 +386,24 @@ class AuditLog(db.Model):
     )
 
 
+class UserAvatar(db.Model):
+    """A user's profile photo, stored in the database.
+
+    Kept out of the users table so the bytes are only read when the photo
+    itself is requested, and out of the filesystem so serverless hosts
+    (where local files do not persist) can serve it.
+    """
+
+    __tablename__ = "user_avatars"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = db.Column(db.String(120), nullable=False, unique=True)
+    content_type = db.Column(db.String(40), nullable=False)
+    data = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
 class RevokedToken(db.Model):
     __tablename__ = "revoked_tokens"
 

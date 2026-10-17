@@ -3,6 +3,8 @@ import secrets
 from pathlib import Path
 from typing import List
 
+from sqlalchemy.pool import NullPool
+
 
 def _as_bool(value: str, default: bool = False) -> bool:
     if value is None:
@@ -25,11 +27,15 @@ def _default_fallback_sqlite_url() -> str:
 
 
 def _resolve_secret_key() -> str:
-    """Resolve SECRET_KEY: require it in production, auto-generate for dev/serverless."""
+    """Resolve SECRET_KEY: required everywhere except local debug runs.
+
+    Serverless platforms run many short-lived instances; a generated key would
+    differ per instance and randomly sign users out, so it must be configured.
+    """
     key = os.getenv("SECRET_KEY")
     if key:
         return key
-    if _as_bool(os.getenv("FLASK_DEBUG"), default=False) or os.getenv("VERCEL"):
+    if _as_bool(os.getenv("FLASK_DEBUG"), default=False) and not os.getenv("VERCEL"):
         return f"dev-auto-{secrets.token_hex(16)}"
     raise RuntimeError(
         "SECRET_KEY environment variable is required in production. "
@@ -61,11 +67,15 @@ def _normalize_database_url(url: str) -> str:
 
 
 def _resolve_database_url() -> str:
-    """Resolve DATABASE_URL: require it or fallback in debug/serverless mode."""
+    """Resolve DATABASE_URL: required everywhere except local debug runs.
+
+    On a serverless platform a SQLite fallback would live in a temporary
+    folder and silently lose every write, so it is never used there.
+    """
     url = os.getenv("DATABASE_URL")
     if url:
         return _normalize_database_url(url)
-    if _as_bool(os.getenv("FLASK_DEBUG"), default=False) or os.getenv("VERCEL"):
+    if _as_bool(os.getenv("FLASK_DEBUG"), default=False) and not os.getenv("VERCEL"):
         return _default_fallback_sqlite_url()
     raise RuntimeError(
         "DATABASE_URL environment variable is required in production. "
@@ -87,6 +97,10 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = (
         {}
         if _resolve_database_url().startswith("sqlite")
+        # Serverless instances are frozen between requests, so pooled
+        # connections would go stale; open one per request instead.
+        else {"poolclass": NullPool}
+        if os.getenv("VERCEL")
         else {
             "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
             "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),

@@ -111,6 +111,43 @@ def _register_cli_commands(app: Flask):
         db.session.commit()
         click.echo(f"Password updated for {user.email}.")
 
+    @app.cli.command("import-avatars")
+    def import_avatars_command():
+        """Copy profile photos from the local uploads folder into the database."""
+        from io import BytesIO
+
+        from werkzeug.datastructures import FileStorage
+
+        from .dependencies import get_auth_service
+        from .models import User, UserAvatar
+
+        service = get_auth_service()
+        imported = skipped = 0
+        for user in User.query.filter(User.avatar_url.isnot(None)).all():
+            filename = user.avatar_url.removeprefix("/api/auth/avatar/")
+            if not service.UPLOADED_AVATAR_FILENAME.fullmatch(filename):
+                continue
+            if UserAvatar.query.filter_by(filename=filename).first():
+                continue
+            path = service.get_avatar_dir() / filename
+            if not path.is_file():
+                skipped += 1
+                click.echo(f"Missing file for {user.email}: {filename}")
+                continue
+            try:
+                data, _extension, content_type = service._read_avatar_image(
+                    FileStorage(stream=BytesIO(path.read_bytes()), filename=filename)
+                )
+            except Exception as error:
+                skipped += 1
+                click.echo(f"Skipped {filename}: {error}")
+                continue
+            # Keep the existing file name so the user's photo URL is unchanged.
+            db.session.add(UserAvatar(user_id=user.id, filename=filename, content_type=content_type, data=data))
+            imported += 1
+        db.session.commit()
+        click.echo(f"Imported {imported} photo(s); skipped {skipped}.")
+
     @app.cli.command("seed-db")
     def seed_db():
         """Seed the database with medical rules, roles, and demo users."""

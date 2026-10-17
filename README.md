@@ -250,21 +250,34 @@ flask --app run.py set-password admin@example.com   # prompts, input hidden
 
 ---
 
-## 🌐 Deploying (Render)
+## 🌐 Deploying (Vercel)
 
-The root `Dockerfile` builds the website and the API into one service, and
-`render.yaml` describes it for Render (Singapore region, close to a Supabase
-database in Mumbai).
+`vercel.json` builds the React site as static files and runs the Flask API
+as a Python function (`api/index.py`) in the Mumbai region (`bom1`), next to
+a Supabase database there. Profile photos are stored in the database, so
+nothing depends on the server's disk.
 
-1. In Render choose **New → Blueprint** and select this repository.
-2. When asked, set `DATABASE_URL` to your Supabase **Session pooler** URL
-   (`postgresql+psycopg://...:5432/postgres`). `SECRET_KEY` is generated.
-3. Leave `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` empty until Google
-   sign-in is set up.
+1. In Vercel choose **Add New → Project** and import this repository
+   (branch `tisa`). Keep the root directory as the repository root.
+2. Add these **Environment Variables** before the first deploy:
+   - `DATABASE_URL`: your Supabase **Session pooler** URL
+     (`postgresql+psycopg://...:5432/postgres`)
+   - `SECRET_KEY`: a long random value (`python generate_secret_key.py`)
+   - `TRUSTED_PROXY_COUNT=1`, `FLASK_DEBUG=0`, `SEED_DEMO_DATA=false`,
+     `DB_AUTO_CREATE=false`, `DB_FALLBACK_ENABLED=false`
+   - optional: `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` (same value)
+3. Deploy. The API refuses to start without `SECRET_KEY` and `DATABASE_URL`,
+   so a missing value shows up as an error instead of lost data.
 
-Every start applies database migrations. Demo accounts are never created on
-the server (`SEED_DEMO_DATA=false`). A brand-new database also needs the rule
-set once: `flask --app run.py sync-knowledge-base --version v3`.
+Vercel does not run database migrations. After pulling changes that add a
+migration, apply it once from your computer with `backend/.env` pointing at
+the production database: `flask --app run.py db upgrade`. A brand-new
+database also needs the rule set once: `flask --app run.py sync-knowledge-base --version v3`.
+Photos uploaded before database storage can be copied in with
+`flask --app run.py import-avatars`.
+
+The root `Dockerfile` and `render.yaml` remain as an alternative single-service
+deployment (e.g. Render).
 
 ---
 

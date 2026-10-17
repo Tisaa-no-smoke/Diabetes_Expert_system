@@ -1,7 +1,7 @@
-from flask import Blueprint, g, request, send_from_directory
+from flask import Blueprint, Response, g, request
 
 from app.dependencies import get_auth_service
-from app.errors import ValidationError
+from app.errors import NotFoundError, ValidationError
 from app.extensions import limiter
 from app.utils.api_response import success_response
 from app.utils.auth import require_auth
@@ -134,5 +134,11 @@ def delete_avatar():
 
 @auth_bp.get("/avatar/<path:filename>")
 def serve_avatar(filename):
-    avatar_dir = get_auth_service().get_avatar_dir()
-    return send_from_directory(str(avatar_dir), filename)
+    avatar = get_auth_service().get_avatar(filename)
+    if avatar is None:
+        raise NotFoundError("Photo not found.")
+    data, content_type = avatar
+    response = Response(data, mimetype=content_type)
+    # Every upload gets a new random file name, so a name never changes content.
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
