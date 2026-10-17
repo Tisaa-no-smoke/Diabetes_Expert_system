@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+#
+# Backend image for Vercel's container runtime (vercel.json `backend` service).
+# Unlike the plain Python runtime it includes WeasyPrint's native libraries,
+# so PDF reports are rendered by WeasyPrint with correctly shaped Khmer text
+# and a searchable text layer.
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
+    libjpeg62-turbo \
+    libopenjp2-7 \
+    libffi8 \
+    fonts-noto-core \
+    fonts-khmeros \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+# Vercel sends traffic to port 80 unless the project sets PORT. Migrations are
+# applied separately (see README), not on every cold start.
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-80} --workers 1 --threads 8 --timeout 120 --access-logfile - --error-logfile - 'app:create_app()'"]
