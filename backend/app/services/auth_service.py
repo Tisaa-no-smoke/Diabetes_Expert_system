@@ -207,6 +207,20 @@ class AuthService:
             try:
                 import requests
 
+                # An access token proves who the user is, but not which app it
+                # was issued to. Without this check a token obtained by any
+                # other site's "Sign in with Google" could sign in here.
+                tokeninfo_resp = requests.get(
+                    "https://oauth2.googleapis.com/tokeninfo",
+                    params={"access_token": credential},
+                    timeout=10,
+                )
+                if tokeninfo_resp.status_code != 200:
+                    raise UnauthorizedError("Failed to verify Google access token with Google API.")
+                token_info = tokeninfo_resp.json()
+                if client_id not in {token_info.get("aud"), token_info.get("azp")}:
+                    raise UnauthorizedError("Google token was not issued for this application.")
+
                 userinfo_resp = requests.get(
                     "https://www.googleapis.com/oauth2/v3/userinfo",
                     headers={"Authorization": f"Bearer {credential}"},
@@ -215,9 +229,11 @@ class AuthService:
                 if userinfo_resp.status_code != 200:
                     raise UnauthorizedError("Failed to verify Google access token with Google API.")
                 id_info = userinfo_resp.json()
+                if not token_info.get("sub") or id_info.get("sub") != token_info.get("sub"):
+                    raise UnauthorizedError("Failed to verify Google credential.")
             except UnauthorizedError:
                 raise
-            except Exception as e:
+            except Exception:
                 raise UnauthorizedError("Failed to verify Google credential.")
 
         if not id_info.get("email_verified"):

@@ -207,12 +207,7 @@ def test_google_login_with_access_token_success(client, app):
         "name": "OAuth User",
         "picture": "https://example.com/avatar.jpg",
     }
-    class MockResponse:
-        status_code = 200
-        def json(self):
-            return userinfo_claims
-
-    with patch("requests.get", return_value=MockResponse()):
+    with patch("requests.get", side_effect=_google_api({"aud": MOCK_CLIENT_ID, "sub": "google-sub-oauth-user"}, userinfo_claims)):
         response = client.post("/api/auth/google", json={"credential": "ya29.mock-access-token"})
         assert response.status_code == 200
         body = response.get_json()
@@ -220,3 +215,51 @@ def test_google_login_with_access_token_success(client, app):
         assert body["data"]["user"]["email"] == "oauthuser@example.com"
         assert body["data"]["user"]["name"] == "OAuth User"
 
+
+
+class _Response:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
+
+    def json(self):
+        return self._payload
+
+
+def _google_api(token_info, userinfo, token_status=200):
+    """Stand-in for Google's tokeninfo and userinfo endpoints."""
+    def fake_get(url, **_kwargs):
+        if "tokeninfo" in url:
+            return _Response(token_info, token_status)
+        return _Response(userinfo)
+    return fake_get
+
+
+ACCESS_TOKEN_USER = {
+    "sub": "google-sub-access",
+    "email": "access.user@example.com",
+    "email_verified": True,
+    "name": "Access User",
+}
+
+
+@pytest.mark.parametrize(
+    ("token_info", "status"),
+    [
+        ({"aud": "another-app.apps.googleusercontent.com", "azp": "another-app.apps.googleusercontent.com", "sub": "google-sub-access"}, 200),
+        ({}, 400),
+    ],
+)
+def test_google_access_token_for_another_app_is_rejected(client, app, token_info, status):
+    with patch("requests.get", side_effect=_google_api(token_info, ACCESS_TOKEN_USER, token_status=status)):
+        response = client.post("/api/auth/google", json={"credential": "ya29.foreign-token"})
+    assert response.status_code == 401
+    with app.app_context():
+        assert User.query.filter_by(email="access.user@example.com").first() is None
+
+
+def test_google_access_token_profile_must_match_the_token(client, app):
+    token_info = {"aud": MOCK_CLIENT_ID, "sub": "someone-else"}
+    with patch("requests.get", side_effect=_google_api(token_info, ACCESS_TOKEN_USER)):
+        response = client.post("/api/auth/google", json={"credential": "ya29.mismatched"})
+    assert response.status_code == 401
