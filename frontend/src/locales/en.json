@@ -105,7 +105,25 @@
     "regSubTitle": "Join to access diagnostic tools, patient records, and follow-up care.",
     "fullNameLabel": "Full Name",
     "namePlaceholder": "Dr. John Doe",
-    "confirmPasswordLabel": "Confirm"
+    "confirmPasswordLabel": "Confirm",
+    "errors": {
+      "passwordShort": "Use at least {{min}} characters.",
+      "passwordLong": "Use at most {{max}} characters.",
+      "passwordBlank": "A password cannot be only spaces.",
+      "rateLimited": "Too many attempts. Please wait a minute and try again.",
+      "nameLong": "Use at most {{max}} characters.",
+      "emailInvalid": "Enter a valid email address, like name@example.com.",
+      "nameRequired": "Enter your full name.",
+      "emailRequired": "Enter your email address.",
+      "confirmRequired": "Type the same password again.",
+      "invalidCredentials": "Incorrect email or password.",
+      "inactive": "This account has been disabled. Please contact your clinic administrator.",
+      "emailInUse": "An account with this email already exists. Try signing in instead."
+    },
+    "hidePassword": "Hide password",
+    "showPassword": "Show password",
+    "passwordMinPlaceholder": "At least {{min}} characters",
+    "confirmPlaceholder": "Repeat password"
   },
   "roles": {
     "user": "User",

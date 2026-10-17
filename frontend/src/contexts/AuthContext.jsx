@@ -1,19 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import api, { AUTH_CLEARED_EVENT, clearAuthStorage, getAccessToken, getApiData, getRefreshToken, setAuthTokens } from '../api/client'
+import api, { AUTH_CLEARED_EVENT, clearAuthStorage, getAccessToken, getApiData, getRefreshToken, readStoredUser, setAuthTokens, writeStoredUser } from '../api/client'
 
 const AuthContext = createContext(null)
-
-function readStoredUser() {
-  const savedUser = localStorage.getItem('user')
-  const token = getAccessToken()
-  if (!savedUser || !token) return null
-
-  try {
-    return JSON.parse(savedUser)
-  } catch {
-    return null
-  }
-}
 
 export function AuthProvider({ children }) {
   const [user, setUserState] = useState(() => readStoredUser())
@@ -22,10 +10,7 @@ export function AuthProvider({ children }) {
   // right after signing in, and a reload in that gap would otherwise find the
   // tokens without the user and fall back to the login page.
   const setUser = useCallback((next) => {
-    if (typeof next !== 'function') {
-      if (next) localStorage.setItem('user', JSON.stringify(next))
-      else localStorage.removeItem('user')
-    }
+    if (typeof next !== 'function') writeStoredUser(next)
     setUserState(next)
   }, [])
 
@@ -43,8 +28,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user))
-    else localStorage.removeItem('user')
+    writeStoredUser(user)
   }, [user])
 
   // Keep the cached user in sync (e.g. profile_completed flips after onboarding,
@@ -76,7 +60,7 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = async (credential) => {
     const response = await api.post('/auth/google', { credential })
     const data = getApiData(response)
-    setAuthTokens(data.access_token || data.token, data.refresh_token)
+    setAuthTokens(data.access_token || data.token, data.refresh_token, { remember: true })
     setUser(data.user)
     return data.user
   }
@@ -104,7 +88,7 @@ export function AuthProvider({ children }) {
   const updateUser = (patch) => {
     setUser((current) => {
       const updated = { ...current, ...patch }
-      localStorage.setItem('user', JSON.stringify(updated))
+      writeStoredUser(updated)
       return updated
     })
   }

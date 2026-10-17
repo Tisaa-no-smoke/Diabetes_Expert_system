@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { AlertCircle, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import api, { getApiData, getApiErrorMessage, setAuthTokens } from '../api/client'
+import api, { getApiData, setAuthTokens } from '../api/client'
+import { authErrorMessage, EMAIL_MAX_LENGTH, isValidEmail, normalizeEmail, PASSWORD_MAX_LENGTH } from '@/lib/validation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/auth/LanguageSwitcher'
@@ -23,6 +24,8 @@ export function LoginPage() {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  // Which input the current error is about, so it can be highlighted.
+  const [errorField, setErrorField] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const transitionDirection = location.state?.authTransition
@@ -43,24 +46,33 @@ export function LoginPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     if (!isValid) {
+      setErrorField(null)
       setError(t('auth.errorEmailPasswordRequired', 'Email and password are required.'))
+      return
+    }
+    if (!isValidEmail(formData.email)) {
+      setErrorField('email')
+      setError(t('auth.errors.emailInvalid', 'Enter a valid email address, like name@example.com.'))
       return
     }
 
     setLoading(true)
     setError('')
+    setErrorField(null)
 
     try {
       const response = await api.post('/auth/login', {
-        email: formData.email,
+        email: normalizeEmail(formData.email),
         password: formData.password,
       })
       const data = getApiData(response)
-      setAuthTokens(data.access_token || data.token, data.refresh_token)
+      setAuthTokens(data.access_token || data.token, data.refresh_token, { remember: formData.rememberMe })
       setUser(data.user)
       navigate('/dashboard')
     } catch (err) {
-      setError(getApiErrorMessage(err, t('auth.errorLoginFailed', 'Login failed')))
+      const { message } = authErrorMessage(err, t, t('auth.errorLoginFailed', 'Login failed'))
+      setErrorField(null)
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -79,7 +91,7 @@ export function LoginPage() {
         navigate('/dashboard')
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, t('auth.errorGoogleLoginFailed', 'Google sign-in failed. Please try again.')))
+      setError(authErrorMessage(err, t, t('auth.errorGoogleLoginFailed', 'Google sign-in failed. Please try again.')).message)
     } finally {
       setLoading(false)
     }
@@ -208,7 +220,7 @@ export function LoginPage() {
             {t('auth.loginPageSub', 'Sign in to continue to your clinical dashboard.')}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-3" style={{ fontFamily: 'var(--font-latin-sans)' }}>
+          <form onSubmit={handleSubmit} noValidate className="space-y-3" style={{ fontFamily: 'var(--font-latin-sans)' }}>
             {/* Email Field */}
             <div className="space-y-1">
               <label htmlFor="email" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -223,9 +235,12 @@ export function LoginPage() {
                   name="email"
                   type="email"
                   required
+                  maxLength={EMAIL_MAX_LENGTH}
+                  aria-invalid={errorField === 'email' || undefined}
+                  aria-describedby={error ? 'login-error' : undefined}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  className={`w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border ${errorField === 'email' ? 'border-red-400 dark:border-red-700' : 'border-slate-200 dark:border-slate-800'} bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all`}
                   placeholder={t('auth.emailPlaceholder', 'Email address')}
                   autoComplete="username"
                 />
@@ -246,6 +261,8 @@ export function LoginPage() {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  maxLength={PASSWORD_MAX_LENGTH}
+                  aria-describedby={error ? 'login-error' : undefined}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
@@ -256,7 +273,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('auth.hidePassword', 'Hide password') : t('auth.showPassword', 'Show password')}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -317,7 +334,7 @@ export function LoginPage() {
 
             {/* Error Display */}
             {error ? (
-              <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium leading-relaxed flex items-center gap-2">
+              <div id="login-error" role="alert" className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium leading-relaxed flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                 <span>{error}</span>
               </div>

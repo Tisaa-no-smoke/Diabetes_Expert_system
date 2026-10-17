@@ -313,3 +313,81 @@ test('a profile photo is positioned and cropped before it is uploaded', async ({
   expect(size.width).toBe(size.height)
   expect(size.width).toBeLessThanOrEqual(512)
 })
+
+test('sign-up explains every problem before it submits', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('app-language', 'en'))
+  await page.goto('/sign-up')
+  await expect(page.locator('#terms')).not.toBeChecked()
+
+  const submit = page.locator('button[type="submit"]')
+  await submit.click()
+  for (const text of ['Enter your full name.', 'Enter your email address.', 'Use at least 8 characters.', 'Type the same password again.', 'Please agree to the terms and conditions.']) {
+    await expect(page.getByText(text, { exact: true })).toBeVisible()
+  }
+  await expect(page.locator('#name')).toBeFocused()
+
+  await page.locator('#name').fill('Form Check')
+  await page.locator('#email').fill('doctor@')
+  await page.locator('#password').fill('        ')
+  await page.locator('#confirmPassword').fill('different-1')
+  await expect(page.getByText('Enter a valid email address, like name@example.com.')).toBeVisible()
+  await expect(page.getByText('A password cannot be only spaces.')).toBeVisible()
+  await expect(page.getByText('Password and confirm password must match.')).toBeVisible()
+
+  // A taken email is reported by the server under the email field.
+  await page.locator('#email').fill('Doctor@Example.com')
+  await page.locator('#password').fill('valid-pass-1')
+  await page.locator('#confirmPassword').fill('valid-pass-1')
+  await page.locator('#terms').check()
+  await submit.click()
+  await expect(page.locator('#email-error')).toHaveText('An account with this email already exists. Try signing in instead.')
+  await expect(page).toHaveURL(/\/sign-up$/)
+})
+
+test('sign-in checks the email and explains a failed attempt', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('app-language', 'en'))
+  await page.goto('/login')
+  await page.locator('#email').fill('doctor@')
+  await page.locator('#password').fill('doctor123')
+  await page.locator('button[type="submit"]').click()
+  await expect(page.locator('#login-error')).toHaveText('Enter a valid email address, like name@example.com.')
+
+  await page.locator('#email').fill('doctor@example.com')
+  await page.locator('#password').fill('wrong-password')
+  await page.locator('button[type="submit"]').click()
+  await expect(page.locator('#login-error')).toHaveText('Incorrect email or password.')
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('"Remember me" decides whether a new tab is still signed in', async ({ page, context }) => {
+  await page.addInitScript(() => localStorage.setItem('app-language', 'en'))
+  const signIn = async (remember) => {
+    await page.goto('/login')
+    await page.locator('#email').fill('patient@example.com')
+    await page.locator('#password').fill('patient123')
+    await page.locator('#remember-me').setChecked(remember)
+    await page.locator('button[type="submit"]').click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+  }
+  const openInNewTab = async () => {
+    const tab = await context.newPage()
+    await tab.goto('/dashboard')
+    // Let the app settle: a signed-out tab redirects to /login after it loads.
+    await tab.waitForURL(/\/(login|dashboard)$/)
+    await tab.waitForLoadState('networkidle')
+    const url = tab.url()
+    await tab.close()
+    return url
+  }
+
+  // Not remembered: the session belongs to this tab only and ends with the browser session.
+  await signIn(false)
+  expect(await openInNewTab()).toMatch(/\/login$/)
+  await page.reload()
+  await expect(page).toHaveURL(/\/dashboard$/)
+
+  // Remembered: other tabs (and later visits) stay signed in.
+  await page.evaluate(() => { sessionStorage.clear() })
+  await signIn(true)
+  expect(await openInNewTab()).toMatch(/\/dashboard$/)
+})

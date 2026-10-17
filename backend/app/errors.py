@@ -59,6 +59,12 @@ def register_error_handlers(app):
 
     @app.errorhandler(HTTPException)
     def handle_http_error(error: HTTPException):
+        if error.code == 429:
+            # Flask-Limiter's description is the raw limit ("5 per 1 minute").
+            return jsonify(_error_payload(
+                code="rate_limited",
+                message="Too many attempts. Please wait a minute and try again.",
+            )), 429
         return jsonify(_error_payload(code=error.name.lower().replace(" ", "_"), message=error.description)), error.code
 
     @app.errorhandler(Exception)

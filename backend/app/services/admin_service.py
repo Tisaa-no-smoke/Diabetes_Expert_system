@@ -1,5 +1,7 @@
 from werkzeug.security import generate_password_hash
 
+from app.utils.validation import normalize_email, normalize_name, validate_password
+
 from app.errors import ForbiddenError, NotFoundError, ValidationError
 from app.utils.seed import DEFAULT_ROLES
 
@@ -52,18 +54,11 @@ class AdminService:
         if not isinstance(payload, dict):
             raise ValidationError('A JSON object is required.')
 
-        email = str(payload.get('email') or '').strip().lower()
-        password = str(payload.get('password') or '')
-        name = str(payload.get('name') or '').strip()
+        email = normalize_email(payload.get('email'))
+        password = validate_password(payload.get('password'))
+        name = normalize_name(payload.get('name'))
         role_names = payload.get('roles') or ['patient']
         is_active = self._as_bool(payload.get('is_active', True))
-
-        if not email or '@' not in email:
-            raise ValidationError('A valid email is required.')
-        if len(password) < 6:
-            raise ValidationError('password must be at least 6 characters.')
-        if not name:
-            raise ValidationError('name is required.')
 
         role_names = self._normalize_role_names(role_names)
         self._validate_role_names(role_names)
@@ -112,19 +107,14 @@ class AdminService:
         updates = {}
 
         if 'email' in payload:
-            email = str(payload.get('email') or '').strip().lower()
-            if not email or '@' not in email:
-                raise ValidationError('A valid email is required.')
+            email = normalize_email(payload.get('email'))
             existing = self.user_repository.get_by_email_case_insensitive(email)
             if existing and existing.id != user_id:
                 raise ValidationError('Email is already in use.')
             updates['email'] = email
 
         if 'name' in payload:
-            name = str(payload.get('name') or '').strip()
-            if not name:
-                raise ValidationError('name is required.')
-            updates['name'] = name
+            updates['name'] = normalize_name(payload.get('name'))
 
         if not updates:
             raise ValidationError('At least one updatable field is required.')
@@ -357,15 +347,11 @@ class AdminService:
             raise NotFoundError('User not found.')
         self._ensure_target_editable(user, actor_claims)
 
-        name = str(payload.get('name') or '').strip()
-        email = str(payload.get('email') or '').strip().lower()
+        name = normalize_name(payload.get('name'))
+        email = normalize_email(payload.get('email'))
         role_name = str(payload.get('role_name') or '').strip().lower()
         is_active = self._as_bool(payload.get('is_active', user.is_active))
 
-        if not name:
-            raise ValidationError('name is required.')
-        if not email or '@' not in email:
-            raise ValidationError('A valid email is required.')
         if not role_name:
             raise ValidationError('role_name is required.')
         if role_name == 'custom':

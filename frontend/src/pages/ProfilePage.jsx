@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { FormSkeleton, UserAvatar } from '@/components/ui'
 import { AvatarCropDialog } from '@/components/profile/AvatarCropDialog'
+import { EMAIL_MAX_LENGTH, isValidEmail, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordProblem } from '@/lib/validation'
 import { cn } from '@/lib/utils'
 
 /*
@@ -866,14 +867,14 @@ export function ProfilePage() {
   )
 }
 
-const MIN_PASSWORD_LENGTH = 8
-const MAX_PASSWORD_LENGTH = 128
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MIN_PASSWORD_LENGTH = PASSWORD_MIN_LENGTH
+const MAX_PASSWORD_LENGTH = PASSWORD_MAX_LENGTH
 
 /** Field errors the server can raise that the client cannot pre-check. */
 const SERVER_ERROR_KEYS = {
   'Current password is incorrect.': ['security.errors.currentIncorrect', 'Current password is incorrect.'],
   'Email is already in use.': ['security.errors.emailInUse', 'That email is already used by another account.'],
+  'A valid email is required.': ['security.errors.emailInvalid', 'Enter a valid email address.'],
 }
 
 function credentialError(err, t, fallbackKey, fallback) {
@@ -967,7 +968,7 @@ function AccountSecurityCard() {
     event.preventDefault()
     const newEmail = emailForm.newEmail.trim().toLowerCase()
     const fail = (field, message) => setEmailState({ busy: false, error: message, field, success: '' })
-    if (!EMAIL_PATTERN.test(newEmail)) return fail('new_email', t(`${NS}.security.errors.emailInvalid`, 'Enter a valid email address.'))
+    if (!isValidEmail(newEmail)) return fail('new_email', t(`${NS}.security.errors.emailInvalid`, 'Enter a valid email address.'))
     if (newEmail === String(user?.email || '').toLowerCase()) return fail('new_email', t(`${NS}.security.errors.emailSame`, 'This is already your email.'))
     if (hasPassword && !emailForm.currentPassword) return fail('current_password', t(`${NS}.security.errors.currentRequired`, 'Enter your current password.'))
 
@@ -988,8 +989,10 @@ function AccountSecurityCard() {
     const { currentPassword, newPassword, confirmPassword } = passwordForm
     const fail = (field, message) => setPasswordState({ busy: false, error: message, field, success: '' })
     if (hasPassword && !currentPassword) return fail('current_password', t(`${NS}.security.errors.currentRequired`, 'Enter your current password.'))
-    if (newPassword.length < MIN_PASSWORD_LENGTH) return fail('new_password', t(`${NS}.security.errors.passwordShort`, 'Use at least {{min}} characters.', { min: MIN_PASSWORD_LENGTH }))
-    if (newPassword.length > MAX_PASSWORD_LENGTH) return fail('new_password', t(`${NS}.security.errors.passwordLong`, 'Use at most {{max}} characters.', { max: MAX_PASSWORD_LENGTH }))
+    const problem = passwordProblem(newPassword)
+    if (problem === 'short') return fail('new_password', t(`${NS}.security.errors.passwordShort`, 'Use at least {{min}} characters.', { min: MIN_PASSWORD_LENGTH }))
+    if (problem === 'long') return fail('new_password', t(`${NS}.security.errors.passwordLong`, 'Use at most {{max}} characters.', { max: MAX_PASSWORD_LENGTH }))
+    if (problem === 'blank') return fail('new_password', t('auth.errors.passwordBlank', 'A password cannot be only spaces.'))
     if (hasPassword && newPassword === currentPassword) return fail('new_password', t(`${NS}.security.errors.passwordSame`, 'Choose a password different from your current one.'))
     if (newPassword !== confirmPassword) return fail('confirm_password', t(`${NS}.security.errors.passwordMismatch`, 'The new passwords do not match.'))
 
@@ -1036,6 +1039,7 @@ function AccountSecurityCard() {
           <input
             id="security-new-email"
             type="email"
+            maxLength={EMAIL_MAX_LENGTH}
             autoComplete="email"
             className={cn(fieldInput, emailState.field === 'new_email' && 'border-rose-400 focus:border-rose-400 focus:ring-rose-100')}
             value={emailForm.newEmail}

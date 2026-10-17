@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import time
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -10,6 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.errors import ForbiddenError, GoogleAuthNotConfiguredError, NotFoundError, UnauthorizedError, ValidationError
 from app.extensions import db
+from app.utils.validation import NAME_MAX_LENGTH, normalize_email, normalize_name, validate_password
 
 
 def _get_google_auth_request():
@@ -50,8 +52,16 @@ def _get_google_auth_request():
 class AuthService:
     ACCESS_TOKEN_TYPE = "access"
     REFRESH_TOKEN_TYPE = "refresh"
-    MIN_PASSWORD_LENGTH = 8
-    MAX_PASSWORD_LENGTH = 128
+    UPLOADED_AVATAR_URL = re.compile(r"/api/auth/avatar/avatar_\d+_\d+_[0-9a-f]{8}\.(?:png|jpe?g|webp|gif)")
+    # Mirrors the users table column sizes so oversized input is a form error.
+    PROFILE_FIELD_MAX_LENGTHS = {
+        "phone": 40,
+        "department": 120,
+        "title": 120,
+        "hospital_affiliation": 255,
+        "license_number": 80,
+        "bio": 2000,
+    }
 
     def __init__(
         self,
@@ -79,18 +89,11 @@ class AuthService:
         if not isinstance(payload, dict):
             raise ValidationError("A JSON object is required.")
 
-        email = str(payload.get("email") or "").strip().lower()
-        password = str(payload.get("password") or "")
-        name = str(payload.get("name") or "").strip()
-
-        if not email or "@" not in email:
-            raise ValidationError("A valid email is required.")
-        if len(password) < 6:
-            raise ValidationError("password must be at least 6 characters.")
-        if not name:
-            raise ValidationError("name is required.")
+        name = normalize_name(payload.get("name"))
+        email = normalize_email(payload.get("email"))
+        password = validate_password(payload.get("password"))
         if self.user_repository.get_by_email_case_insensitive(email):
-            raise ValidationError("Email is already in use.")
+            raise ValidationError("Email is already in use.", details={"field": "email"})
 
         patient_role = self.user_repository.get_role_by_name("patient")
         if not patient_role:
@@ -222,7 +225,8 @@ class AuthService:
 
         google_sub = str(id_info.get("sub") or "").strip()
         email = str(id_info.get("email") or "").strip().lower()
-        name = str(id_info.get("name") or id_info.get("given_name") or email.split("@")[0]).strip()
+        # Fit the column; a Google display name is trusted but may be long.
+        name = " ".join(str(id_info.get("name") or id_info.get("given_name") or email.split("@")[0]).split())[:NAME_MAX_LENGTH]
         picture = id_info.get("picture")
 
         if not google_sub or not email:
@@ -412,17 +416,7 @@ class AuthService:
         user = self._get_active_user(user_id)
         self._verify_current_password(user, current_password)
 
-        new_password = str(new_password or "")
-        if len(new_password) < self.MIN_PASSWORD_LENGTH:
-            raise ValidationError(
-                f"New password must be at least {self.MIN_PASSWORD_LENGTH} characters.",
-                details={"field": "new_password"},
-            )
-        if len(new_password) > self.MAX_PASSWORD_LENGTH:
-            raise ValidationError(
-                f"New password must be at most {self.MAX_PASSWORD_LENGTH} characters.",
-                details={"field": "new_password"},
-            )
+        new_password = validate_password(new_password, field="new_password")
         if user.password_hash and check_password_hash(user.password_hash, new_password):
             raise ValidationError(
                 "New password must be different from the current password.",
@@ -442,10 +436,7 @@ class AuthService:
         user = self._get_active_user(user_id)
         self._verify_current_password(user, current_password)
 
-        email = str(new_email or "").strip().lower()
-        local, _, domain = email.partition("@")
-        if not local or "." not in domain or " " in email or len(email) > 255:
-            raise ValidationError("A valid email is required.", details={"field": "new_email"})
+        email = normalize_email(new_email, field="new_email")
         if email == (user.email or "").lower():
             raise ValidationError("This is already your email.", details={"field": "new_email"})
         existing = self.user_repository.get_by_email_case_insensitive(email)
@@ -590,19 +581,30 @@ class AuthService:
 
         updates = {}
         if "name" in payload:
-            name = str(payload.get("name") or "").strip()
-            if not name:
-                raise ValidationError("Name cannot be empty.")
-            updates["name"] = name
+            updates["name"] = normalize_name(payload.get("name"))
 
-        for field in ("phone", "department", "title", "hospital_affiliation", "license_number", "bio", "avatar_url"):
+        for field, max_length in self.PROFILE_FIELD_MAX_LENGTHS.items():
             if field in payload:
                 val = payload.get(field)
                 if val is not None:
                     val = str(val).strip()
                     if val == "":
                         val = None
+                if val is not None and len(val) > max_length:
+                    raise ValidationError(
+                        f"{field} must be at most {max_length} characters.",
+                        details={"field": field, "rule": "max_length", "max": max_length},
+                    )
                 updates[field] = val
+
+        if "avatar_url" in payload:
+            # Photos are set through the upload endpoint; here they can only be
+            # cleared or pointed back at an uploaded file, never at an outside
+            # address (which would expose every viewer's IP to that server).
+            avatar_url = str(payload.get("avatar_url") or "").strip() or None
+            if avatar_url is not None and not self.UPLOADED_AVATAR_URL.fullmatch(avatar_url):
+                raise ValidationError("avatar_url must be an uploaded photo.", details={"field": "avatar_url"})
+            updates["avatar_url"] = avatar_url
 
         if not updates:
             raise ValidationError("At least one profile field is required to update.")

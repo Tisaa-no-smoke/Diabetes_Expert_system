@@ -1,7 +1,18 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { AlertCircle, Eye, EyeOff, LockKeyhole, Mail, User } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import api, { getApiData, getApiErrorMessage, setAuthTokens } from '../api/client'
+import api, { getApiData, setAuthTokens } from '../api/client'
+import {
+  authErrorMessage,
+  EMAIL_MAX_LENGTH,
+  isValidEmail,
+  NAME_MAX_LENGTH,
+  normalizeEmail,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  passwordProblem,
+  passwordProblemMessage,
+} from '@/lib/validation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguageSwitcher } from '@/components/auth/LanguageSwitcher'
@@ -9,6 +20,16 @@ import { AuthShowcasePanel } from '@/components/auth/AuthShowcasePanel'
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+function FieldError({ id, message }) {
+  if (!message) return null
+  return (
+    <p id={id} className="flex items-center gap-1 pt-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+      <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
+      {message}
+    </p>
+  )
+}
 
 export function SignUpPage() {
   const { setUser, loginWithGoogle } = useAuth()
@@ -23,11 +44,17 @@ export function SignUpPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    agreeToTerms: true,
+    // Consent must be an active choice, so the box starts unticked.
+    agreeToTerms: false,
   })
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Field messages appear once a field has been left or the form submitted,
+  // not while someone is still typing their first characters.
+  const [touched, setTouched] = useState({})
+  const [submitted, setSubmitted] = useState(false)
+  const [serverFieldErrors, setServerFieldErrors] = useState({})
 
   const transitionDirection = location.state?.authTransition
   const formAnimationClass =
@@ -37,37 +64,61 @@ export function SignUpPage() {
       ? 'auth-anim-to-login'
       : 'auth-anim-default'
 
-  const isValid = useMemo(
+  const fieldErrors = useMemo(() => {
+    const errors = {}
+    const name = formData.name.trim()
+    if (!name) errors.name = t('auth.errors.nameRequired', 'Enter your full name.')
+    else if (name.length > NAME_MAX_LENGTH) errors.name = t('auth.errors.nameLong', 'Use at most {{max}} characters.', { max: NAME_MAX_LENGTH })
+    if (!formData.email.trim()) errors.email = t('auth.errors.emailRequired', 'Enter your email address.')
+    else if (!isValidEmail(formData.email)) errors.email = t('auth.errors.emailInvalid', 'Enter a valid email address, like name@example.com.')
+    const problem = passwordProblem(formData.password)
+    if (problem) errors.password = passwordProblemMessage(problem, t)
+    if (!formData.confirmPassword) errors.confirmPassword = t('auth.errors.confirmRequired', 'Type the same password again.')
+    else if (formData.password !== formData.confirmPassword) errors.confirmPassword = t('auth.errorPasswordMismatch', 'Password and confirm password must match.')
+    if (!formData.agreeToTerms) errors.terms = t('auth.errorAgreeTerms', 'Please agree to the terms and conditions.')
+    return { ...errors, ...serverFieldErrors }
+  }, [formData, serverFieldErrors, t])
 
-    () =>
-      Boolean(
-        formData.name.trim() &&
-        formData.email.trim() &&
-        formData.password.length >= 6 &&
-        formData.password === formData.confirmPassword
-      ),
-    [formData]
-  )
+  const inputClass = (field, base) =>
+    visibleError(field) ? base.replace('border-slate-200 dark:border-slate-800', 'border-red-400 dark:border-red-700') : base
+  const visibleError = (field) => ((submitted || touched[field]) ? fieldErrors[field] : '')
+  const markTouched = (field) => () => setTouched((current) => ({ ...current, [field]: true }))
+  const updateField = (field, value) => {
+    setFormData((current) => ({ ...current, [field]: value }))
+    if (serverFieldErrors[field]) setServerFieldErrors(({ [field]: _cleared, ...rest }) => rest)
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!isValid) return
+    setSubmitted(true)
+    const order = ['name', 'email', 'password', 'confirmPassword', 'terms']
+    const firstInvalid = order.find((field) => fieldErrors[field])
+    if (firstInvalid) {
+      document.getElementById(firstInvalid === 'terms' ? 'terms' : firstInvalid)?.focus()
+      return
+    }
 
     setLoading(true)
     setError('')
 
     try {
       const response = await api.post('/auth/register', {
-        name: formData.name,
-        email: formData.email,
+        name: formData.name.trim(),
+        email: normalizeEmail(formData.email),
         password: formData.password,
       })
       const data = getApiData(response)
-      setAuthTokens(data.access_token || data.token, data.refresh_token)
+      setAuthTokens(data.access_token || data.token, data.refresh_token, { remember: true })
       setUser(data.user)
       navigate('/profile-setup')
     } catch (err) {
-      setError(getApiErrorMessage(err, t('auth.errorRegistrationFailed', 'Registration failed')))
+      const { field, message } = authErrorMessage(err, t, t('auth.errorRegistrationFailed', 'Registration failed'))
+      if (['name', 'email', 'password'].includes(field)) {
+        setServerFieldErrors({ [field]: message })
+        document.getElementById(field)?.focus()
+      } else {
+        setError(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -86,7 +137,7 @@ export function SignUpPage() {
         navigate('/dashboard')
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, t('auth.errorGoogleLoginFailed', 'Google sign-in failed. Please try again.')))
+      setError(authErrorMessage(err, t, t('auth.errorGoogleLoginFailed', 'Google sign-in failed. Please try again.')).message)
     } finally {
       setLoading(false)
     }
@@ -215,7 +266,7 @@ export function SignUpPage() {
             {t('auth.regSubTitle', 'Join to access diagnostic tools, patient records, and follow-up care.')}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-2.5" style={{ fontFamily: 'var(--font-latin-sans)' }}>
+          <form onSubmit={handleSubmit} noValidate className="space-y-2.5" style={{ fontFamily: 'var(--font-latin-sans)' }}>
             {/* Full Name */}
             <div className="space-y-1">
               <label htmlFor="name" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -230,12 +281,18 @@ export function SignUpPage() {
                   name="name"
                   type="text"
                   required
+                  maxLength={NAME_MAX_LENGTH + 20}
+                  autoComplete="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  onChange={(e) => updateField('name', e.target.value)}
+                  onBlur={markTouched('name')}
+                  aria-invalid={Boolean(visibleError('name')) || undefined}
+                  aria-describedby={visibleError('name') ? 'name-error' : undefined}
+                  className={inputClass('name', 'w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all')}
                   placeholder={t('auth.namePlaceholder', 'Dr. John Doe')}
                 />
               </div>
+              <FieldError id="name-error" message={visibleError('name')} />
             </div>
 
             {/* Email Address */}
@@ -252,13 +309,18 @@ export function SignUpPage() {
                   name="email"
                   type="email"
                   required
+                  maxLength={EMAIL_MAX_LENGTH}
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  onChange={(e) => updateField('email', e.target.value)}
+                  onBlur={markTouched('email')}
+                  aria-invalid={Boolean(visibleError('email')) || undefined}
+                  aria-describedby={visibleError('email') ? 'email-error' : undefined}
+                  className={inputClass('email', 'w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all')}
                   placeholder="doctor@example.com"
                   autoComplete="username"
                 />
               </div>
+              <FieldError id="email-error" message={visibleError('email')} />
             </div>
 
             {/* Password & Confirm Password (Responsive 2-col on sm+) */}
@@ -276,22 +338,27 @@ export function SignUpPage() {
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
-                    required
+                  required
+                    maxLength={PASSWORD_MAX_LENGTH}
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-9 pr-9 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                    placeholder="Min 6 chars"
+                    onChange={(e) => updateField('password', e.target.value)}
+                    onBlur={markTouched('password')}
+                    aria-invalid={Boolean(visibleError('password')) || undefined}
+                    aria-describedby={visibleError('password') ? 'password-error' : undefined}
+                    className={inputClass('password', 'w-full pl-9 pr-9 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all')}
+                    placeholder={t('auth.passwordMinPlaceholder', 'At least {{min}} characters', { min: PASSWORD_MIN_LENGTH })}
                     autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hidePassword', 'Hide password') : t('auth.showPassword', 'Show password')}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                <FieldError id="password-error" message={visibleError('password')} />
               </div>
 
               {/* Confirm Password */}
@@ -307,14 +374,19 @@ export function SignUpPage() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
-                    required
+                  required
+                    maxLength={PASSWORD_MAX_LENGTH}
                     value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                    placeholder="Repeat"
+                    onChange={(e) => updateField('confirmPassword', e.target.value)}
+                    onBlur={markTouched('confirmPassword')}
+                    aria-invalid={Boolean(visibleError('confirmPassword')) || undefined}
+                    aria-describedby={visibleError('confirmPassword') ? 'confirmPassword-error' : undefined}
+                    className={inputClass('confirmPassword', 'w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all')}
+                    placeholder={t('auth.confirmPlaceholder', 'Repeat password')}
                     autoComplete="new-password"
                   />
                 </div>
+                <FieldError id="confirmPassword-error" message={visibleError('confirmPassword')} />
               </div>
             </div>
 
@@ -325,7 +397,9 @@ export function SignUpPage() {
                   id="terms"
                   type="checkbox"
                   checked={formData.agreeToTerms}
-                  onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
+                  onChange={(e) => updateField('agreeToTerms', e.target.checked)}
+                  aria-invalid={Boolean(visibleError('terms')) || undefined}
+                  aria-describedby={visibleError('terms') ? 'terms-error' : undefined}
                   className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 <span>
@@ -335,12 +409,13 @@ export function SignUpPage() {
                   </span>
                 </span>
               </label>
+              <FieldError id="terms-error" message={visibleError('terms')} />
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !isValid}
+              disabled={loading}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-500/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
               style={{ fontFamily: 'var(--font-latin-display)' }}
             >

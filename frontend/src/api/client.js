@@ -18,29 +18,65 @@ const api = axios.create({
   timeout: resolveApiTimeout(),
 })
 
+const USER_KEY = 'user'
+
+/**
+ * Where the current session lives. "Remember me" keeps it in localStorage
+ * (survives closing the browser); otherwise it is kept in sessionStorage and
+ * ends with the browser session, which suits shared clinic computers.
+ */
+function sessionStore() {
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY) ? sessionStorage : localStorage
+}
+
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem('token')
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem('token')
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY)
+  return sessionStore().getItem(REFRESH_TOKEN_KEY)
 }
 
-export function setAuthTokens(accessToken, refreshToken) {
+/**
+ * Store tokens. Pass `remember` when signing in to choose where the session
+ * lives; leave it out (token refresh, credential changes) to keep the
+ * session where it already is.
+ */
+export function setAuthTokens(accessToken, refreshToken, { remember } = {}) {
+  let store = sessionStore()
+  if (remember !== undefined) {
+    store = remember ? localStorage : sessionStorage
+    const other = remember ? sessionStorage : localStorage
+    for (const key of [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, 'token']) other.removeItem(key)
+  }
   if (accessToken) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
+    store.setItem(ACCESS_TOKEN_KEY, accessToken)
     localStorage.removeItem('token')
   }
   if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+    store.setItem(REFRESH_TOKEN_KEY, refreshToken)
   }
 }
 
+/** The signed-in user saved alongside the tokens, or null. */
+export function readStoredUser() {
+  if (!getAccessToken()) return null
+  try {
+    return JSON.parse(sessionStore().getItem(USER_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
+export function writeStoredUser(user) {
+  if (user) sessionStore().setItem(USER_KEY, JSON.stringify(user))
+  else sessionStore().removeItem(USER_KEY)
+}
+
 export function clearAuthStorage() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  for (const store of [localStorage, sessionStorage]) {
+    for (const key of [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, 'token']) store.removeItem(key)
+  }
   window.dispatchEvent(new Event(AUTH_CLEARED_EVENT))
 }
 
@@ -98,9 +134,7 @@ api.interceptors.response.use(
       const refreshResponse = await refreshPromise
       const refreshData = getApiData(refreshResponse)
       setAuthTokens(refreshData.access_token, refreshData.refresh_token)
-      if (refreshData.user) {
-        localStorage.setItem('user', JSON.stringify(refreshData.user))
-      }
+      if (refreshData.user) writeStoredUser(refreshData.user)
 
       const accessToken = getAccessToken()
       if (accessToken) {
