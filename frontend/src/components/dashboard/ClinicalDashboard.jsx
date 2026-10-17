@@ -572,17 +572,21 @@ export function ClinicalDashboard({ activeRole }) {
     [t]
   )
 
+  // Range changes can overlap on a slow connection; only the newest request
+  // may update the dashboard so a late response cannot show the wrong range.
+  const latestStatsRequest = useRef(0)
   const fetchStats = useCallback(async (query = {}) => {
+    const requestId = ++latestStatsRequest.current
     try {
       setLoading(true)
       const response = await api.get('/dashboard/clinical', { params: query })
-      const data = getApiData(response)
-      setStats(data)
-    } catch (err) {
-      console.error('Failed to load dashboard stats:')
+      if (requestId !== latestStatsRequest.current) return
+      setStats(getApiData(response))
+    } catch {
+      if (requestId !== latestStatsRequest.current) return
       notify.error(t('dashboard.errorLoad', 'Could not load dashboard statistics.'))
     } finally {
-      setLoading(false)
+      if (requestId === latestStatsRequest.current) setLoading(false)
     }
   }, [t])
 
@@ -618,7 +622,7 @@ export function ClinicalDashboard({ activeRole }) {
     return [
       {
         key: 'urgent',
-        label: t('dashboard.focus.urgentPatients', 'Urgent patients'),
+        label: t('dashboard.focus.urgentCases', 'Urgent cases'),
         helper: t('dashboard.focus.urgentPatientsHint', 'Awaiting review'),
         action: t('dashboard.focus.reviewNow', 'Review now'),
         value: stats.doctor_workload?.urgent_pending ?? stats.urgent_cases.value,
@@ -753,48 +757,7 @@ export function ClinicalDashboard({ activeRole }) {
               color,
             }
           })
-        : [
-            {
-              id: 1,
-              name: t('kbDashboard.mockRules.hyperglycemiaTriage', 'Hyperglycemia Triage'),
-              fullName: t('kbDashboard.mockRules.hyperglycemiaTriageFull', 'Severe Hyperglycemia Triage Protocol'),
-              hits: 45,
-              category: t('kbDashboard.categories.triage', 'Triage'),
-              color: '#f59e0b',
-            },
-            {
-              id: 2,
-              name: t('kbDashboard.mockRules.t2dCriteria', 'T2D Criteria'),
-              fullName: t('kbDashboard.mockRules.t2dCriteriaFull', 'Type 2 Diabetes Diagnostic Criteria'),
-              hits: 38,
-              category: t('kbDashboard.categories.diagnosis', 'Diagnosis'),
-              color: '#2563eb',
-            },
-            {
-              id: 3,
-              name: t('kbDashboard.mockRules.lifestyleGuidance', 'Lifestyle Guidance'),
-              fullName: t('kbDashboard.mockRules.lifestyleGuidanceFull', 'Dietary & Physical Activity Guidance'),
-              hits: 31,
-              category: t('kbDashboard.categories.recommendation', 'Recommendation'),
-              color: '#10b981',
-            },
-            {
-              id: 4,
-              name: t('kbDashboard.mockRules.hba1cStrat', 'HbA1c Stratification'),
-              fullName: t('kbDashboard.mockRules.hba1cStratFull', 'HbA1c Glycemic Stratification Protocol'),
-              hits: 24,
-              category: t('kbDashboard.categories.classification', 'Classification'),
-              color: '#06b6d4',
-            },
-            {
-              id: 5,
-              name: t('kbDashboard.mockRules.hypoglycemiaSafety', 'Hypoglycemia Safety'),
-              fullName: t('kbDashboard.mockRules.hypoglycemiaSafetyFull', 'Acute Hypoglycemia Alert & Safety Protocol'),
-              hits: 18,
-              category: t('kbDashboard.categories.triage', 'Triage'),
-              color: '#f59e0b',
-            },
-          ]
+        : []
 
     // Category distribution
     const rawDistribution = rulesAnalytics?.rule_distribution || []
@@ -809,12 +772,7 @@ export function ClinicalDashboard({ activeRole }) {
               color: c.color || '#2563eb',
             }
           })
-        : [
-            { rawName: 'Diagnosis', name: t('kbDashboard.categories.diagnosis', 'Diagnosis'), value: 14, color: '#2563eb' },
-            { rawName: 'Recommendation', name: t('kbDashboard.categories.recommendation', 'Recommendation'), value: 10, color: '#10b981' },
-            { rawName: 'Triage', name: t('kbDashboard.categories.triage', 'Triage'), value: 8, color: '#f59e0b' },
-            { rawName: 'Classification', name: t('kbDashboard.categories.classification', 'Classification'), value: 6, color: '#06b6d4' },
-          ]
+        : []
 
     return {
       totalActive,
@@ -831,7 +789,7 @@ export function ClinicalDashboard({ activeRole }) {
     title: item.is_urgent
       ? t('dashboard.focus.activityHighRisk', 'Patient marked high risk')
       : item.has_care_plan
-        ? t('dashboard.focus.activityPlan', 'Treatment plan updated')
+        ? t('dashboard.focus.activityPlan', 'Care recommendations issued')
         : item.status === 'Reviewed'
           ? t('dashboard.focus.activityCompleted', 'Assessment completed')
           : t('dashboard.focus.activityNew', 'New assessment completed'),
@@ -842,7 +800,7 @@ export function ClinicalDashboard({ activeRole }) {
       {/* ── Patient-first command header ────────────────────────── */}
       <section className="clinical-hero dash-fade-up relative overflow-hidden rounded-[1.5rem] border border-primary-100 bg-primary-50 text-slate-900 shadow-soft dark:border-primary-500/25 dark:bg-[#0b2944] dark:text-white">
         <div className="clinical-hero-image pointer-events-none absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/images/banner2.png')" }} aria-hidden />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/75 via-white/30 to-transparent dark:from-slate-950/55 dark:via-slate-950/15 dark:to-transparent" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/75 via-white/30 to-transparent dark:from-slate-950/85 dark:via-slate-950/65 dark:to-slate-950/45" aria-hidden />
         <div className="dash-aurora absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400" aria-hidden />
 
         <div className="relative grid gap-7 px-5 py-6 sm:px-7 sm:py-7 xl:grid-cols-[minmax(0,1fr)_21rem] xl:items-center">
@@ -865,7 +823,7 @@ export function ClinicalDashboard({ activeRole }) {
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
               {heroStatsReady
-                ? t('dashboard.focus.heroDesc', '{{patients}} patients in your clinic. {{pending}} cases need review in {{range}}.', {
+                ? t(stats.active_patients.value === 1 ? 'dashboard.focus.heroDescOne' : 'dashboard.focus.heroDesc', '{{patients}} patients in your clinic. {{pending}} cases need review in {{range}}.', {
                     patients: stats.active_patients.value,
                     pending: stats.doctor_workload?.pending_reviews ?? 0,
                     range: activeRangeLabel,
@@ -889,7 +847,7 @@ export function ClinicalDashboard({ activeRole }) {
             </div>
           </div>
 
-          <div className="dash-fade-up rounded-3xl border border-white/80 bg-white/65 p-4 shadow-lg shadow-primary-900/5 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.08] sm:p-5">
+          <div className="dash-fade-up rounded-3xl border border-white/80 bg-white/65 p-4 shadow-lg shadow-primary-900/5 backdrop-blur-md dark:border-white/10 dark:bg-slate-950/70 sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-700 dark:text-cyan-200">
@@ -1027,11 +985,19 @@ export function ClinicalDashboard({ activeRole }) {
             </div>
 
             <aside className="clinical-activity surface flex h-full flex-col px-4 py-4 sm:px-5 dark:border-[#1b2342]">
-              <Link to="/review" className="mb-3 flex min-h-9 items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('dashboard.focus.highRiskSinceYesterday', '2 patients became high-risk since yesterday')}</span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              </Link>
+              {stats?.new_urgent_patients > 0 && (
+                <Link to="/review" className="mb-3 flex min-h-9 items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">
+                    {t(
+                      stats.new_urgent_patients === 1 ? 'dashboard.focus.highRiskSinceYesterday' : 'dashboard.focus.highRiskSinceYesterday_plural',
+                      '{{count}} patients became high-risk since yesterday',
+                      { count: stats.new_urgent_patients },
+                    )}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                </Link>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/25 dark:text-primary-300"><Activity className="h-4 w-4" aria-hidden /></span>
@@ -1116,7 +1082,13 @@ export function ClinicalDashboard({ activeRole }) {
 
               {/* Chart visualization */}
               <div className="h-[200px] w-full">
-                {kbChartType === 'rules' ? (
+                {(kbChartType === 'rules' ? kbStats.topRulesData : kbStats.categoryData).length === 0 ? (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    {kbChartType === 'rules'
+                      ? t('kbDashboard.noTriggeredRules', 'No rules triggered yet in this timeframe.')
+                      : t('kbDashboard.noRulesConfigured', 'No rules configured yet.')}
+                  </div>
+                ) : kbChartType === 'rules' ? (
                   <ChartContainer config={{ hits: { label: t('kbDashboard.columns.hits', 'Triggers') } }} className="h-full w-full">
                     <BarChart
                       layout="vertical"

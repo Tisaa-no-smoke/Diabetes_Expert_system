@@ -1,6 +1,6 @@
 """Doctor-facing clinical dashboard: custom date range + personal workload."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from app.extensions import db
 from app.models import DiagnosisResult, Patient
@@ -177,3 +177,38 @@ def test_workload_ignores_other_reviewers(client, app, doctor_auth):
 
     after = _fetch(client, headers, **WINDOW)
     assert after["doctor_workload"]["reviewed_by_me"] == baseline["doctor_workload"]["reviewed_by_me"]
+
+
+def test_new_urgent_patients_counts_distinct_recent_patients(client, app, doctor_auth):
+    """The 'became high-risk' banner counts patients, not cases, since yesterday."""
+    headers = {"Authorization": f"Bearer {doctor_auth['access_token']}"}
+    baseline = _fetch(client, headers)["new_urgent_patients"]
+
+    def result(patient_id, *, urgent, created_at):
+        return DiagnosisResult(
+            patient_id=patient_id,
+            diagnosis="Diabetes Mellitus",
+            certainty=0.9,
+            facts_json={},
+            triggered_rules_json=[],
+            is_urgent=urgent,
+            created_at=created_at,
+        )
+
+    with app.app_context():
+        recent = Patient(full_name="Recent Urgent Patient", gender="unknown")
+        stale = Patient(full_name="Stale Urgent Patient", gender="unknown")
+        calm = Patient(full_name="Recent Calm Patient", gender="unknown")
+        db.session.add_all([recent, stale, calm])
+        db.session.flush()
+        now = datetime.now(UTC).replace(tzinfo=None)
+        db.session.add_all([
+            # Two urgent cases for one patient still count as one patient.
+            result(recent.id, urgent=True, created_at=now),
+            result(recent.id, urgent=True, created_at=now - timedelta(hours=1)),
+            result(stale.id, urgent=True, created_at=now - timedelta(days=5)),
+            result(calm.id, urgent=False, created_at=now),
+        ])
+        db.session.commit()
+
+    assert _fetch(client, headers)["new_urgent_patients"] == baseline + 1

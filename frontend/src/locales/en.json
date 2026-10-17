@@ -44,7 +44,16 @@
     "disableUser": "Disable User",
     "enableUser": "Enable User",
     "loading": "Loading...",
-    "yearsShort": "yrs"
+    "yearsShort": "yrs",
+    "close": "Close",
+    "userMenu": "User menu",
+    "tryAdjustingFilters": "Try adjusting your search terms or category filter.",
+    "none": "None reported",
+    "yearsUnit": "yrs",
+    "notTested": "Not tested",
+    "of": "of",
+    "nameRequired": "Full Name is required.",
+    "saveFailed": "Could not save profile changes."
   },
   "auth": {
     "loginTitle": "Welcome Back",
@@ -90,13 +99,20 @@
     "orDivider": "OR",
     "signInWithGoogle": "Sign in with Google",
     "signUpWithGoogle": "Sign up with Google",
-    "errorGoogleLoginFailed": "Google sign-in failed. Please try again."
+    "errorGoogleLoginFailed": "Google sign-in failed. Please try again.",
+    "signupWithGoogle": "Sign up with Google",
+    "signinWithGoogle": "Sign in with Google",
+    "regSubTitle": "Join to access diagnostic tools, patient records, and follow-up care.",
+    "fullNameLabel": "Full Name",
+    "namePlaceholder": "Dr. John Doe",
+    "confirmPasswordLabel": "Confirm"
   },
   "roles": {
     "user": "User",
     "patient": "Patient",
     "doctor": "Doctor",
-    "admin": "Admin"
+    "admin": "Admin",
+    "reviewer": "Reviewer"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -760,7 +776,8 @@
       "lastCheckToday": "Today",
       "lastCheckYesterday": "Yesterday",
       "lastCheckDaysAgo": "{{count}} days ago",
-      "lastCheckNever": "No checks yet"
+      "lastCheckNever": "No checks yet",
+      "subtitle": "Here is your daily health overview"
     },
     "situation": {
       "title": "Your situation",
@@ -774,7 +791,10 @@
       "highA1cDesc": "Your recent HbA1c is {{hba1c}}, above the 5.7% target. Staying consistent with daily habits and your doctor will help guide your levels lower.",
       "urgentDesc": "Your recent readings are higher than standard target ranges. Follow your care plan and consult your doctor.",
       "stableDesc": "Your latest metabolic indicators and blood sugar levels look stable. Keep maintaining your daily routine.",
-      "noResultDesc": "Take your first assessment to receive personalized guidance, risk evaluation, and customized health targets."
+      "noResultDesc": "Take your first assessment to receive personalized guidance, risk evaluation, and customized health targets.",
+      "newAssessment": "New assessment",
+      "takeNewAssessment": "Take New Assessment",
+      "viewDoctorReport": "View Doctor Report"
     },
     "health": {
       "title": "Health snapshot",
@@ -796,7 +816,8 @@
       "mgdlUnit": "mg/dL",
       "emptyTitle": "No health metrics yet",
       "emptyDescription": "Complete an assessment with your height, weight and lab values to see your BMI, glucose and HbA1c here.",
-      "disclaimer": "Screening reference only — always confirm results with your clinician."
+      "disclaimer": "Screening reference only — always confirm results with your clinician.",
+      "vitalsSnapshot": "Key Health Highlights"
     },
     "recentAssessments": {
       "title": "Recent Assessments",
@@ -1816,7 +1837,10 @@
       "sleepBorderline": "6–7 hours (Slightly short)",
       "sleepShort": "< 6 hours / Diagnosed sleep apnea",
       "habitsTitle": "Smoking & Alcohol Habits",
-      "habitsHelper": "Tobacco use and excessive alcohol intake increase metabolic load and cardiovascular risk."
+      "habitsHelper": "Tobacco use and excessive alcohol intake increase metabolic load and cardiovascular risk.",
+      "orSelectRange": "Or select age range",
+      "startSelfCheck": "Start Assessment",
+      "ethnicity": "Ethnicity"
     },
     "options": {
       "age": {
@@ -1840,7 +1864,8 @@
       "ogtt": {
         "normal": "Normal",
         "prediabetes": "Pre-diabetes",
-        "diabetes": "Diabetes"
+        "diabetes": "Diabetes",
+        "severe": "Critical"
       }
     },
     "fields": {
@@ -1932,7 +1957,8 @@
       "loading": "Loading patients...",
       "selectPlaceholder": "Select patient",
       "noPatients": "No patients available",
-      "noSelection": "Not selected"
+      "noSelection": "Not selected",
+      "pleaseSelect": "Please select a patient."
     },
     "profile": {
       "ageTitle": "How old are you?",
@@ -1985,7 +2011,10 @@
       "ogttTitle": "2-Hour OGTT (optional)",
       "ogttHelper": "mg/dL — measured 2 hours after 75g glucose load",
       "rpgTitle": "Random Blood Glucose (optional)",
-      "rpgHelper": "mg/dL — any time, no fasting needed"
+      "rpgHelper": "mg/dL — any time, no fasting needed",
+      "diabetic": "Diabetic (≥ 126)",
+      "prediabetic": "Impaired (100–125)",
+      "normal": "Normal (< 100)"
     },
     "riskFactors": {
       "title": "Risk factors checklist",
@@ -2044,8 +2073,7 @@
       "lowRiskAlert": "Low / Normal Risk (< 5 points)",
       "noUrgentFlags": "No acute warning signs",
       "urgentWarningPresent": "Urgent / DKA Warning signs detected",
-      "hypoWarningPresent": "Hypoglycemia risk signs reported",
-      "currentUser": "Current user"
+      "hypoWarningPresent": "Hypoglycemia risk signs reported"
     },
     "footer": {
       "continueHint": "Answer each section, then continue.",
@@ -2832,7 +2860,11 @@
           "meaning": "Some ethnic groups (South Asian, Southeast Asian and others) face higher risk at lower weights — screen earlier."
         }
       }
-    }
+    },
+    "downloadPdfFailed": "Failed to download PDF report",
+    "assessmentResultTitle": "Assessment Result",
+    "assessmentResultSubtitle": "Summary of the analysis and recommendations",
+    "keyFindings": "Key Findings"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -2926,7 +2958,8 @@
       "overview": "Overview",
       "editor": "Rule Editor",
       "visual": "Visual Graph",
-      "sandbox": "Sandbox"
+      "sandbox": "Sandbox",
+      "facts": "Facts"
     },
     "dashboard": {
       "visualLogicGraph": "Visual Logic Graph",
@@ -3030,18 +3063,6 @@
       "recommendation": "Recommendation",
       "classification": "Classification"
     },
-    "mockRules": {
-      "hyperglycemiaTriage": "Hyperglycemia Triage",
-      "hyperglycemiaTriageFull": "Severe Hyperglycemia Triage Protocol",
-      "t2dCriteria": "T2D Criteria",
-      "t2dCriteriaFull": "Type 2 Diabetes Diagnostic Criteria",
-      "lifestyleGuidance": "Lifestyle Guidance",
-      "lifestyleGuidanceFull": "Dietary & Physical Activity Guidance",
-      "hba1cStrat": "HbA1c Stratification",
-      "hba1cStratFull": "HbA1c Glycemic Stratification Protocol",
-      "hypoglycemiaSafety": "Hypoglycemia Safety",
-      "hypoglycemiaSafetyFull": "Acute Hypoglycemia Alert & Safety Protocol"
-    },
     "ranges": {
       "last7Days": "Last 7 Days",
       "last30Days": "Last 30 Days",
@@ -3095,7 +3116,9 @@
       "reviewed": "Reviewed",
       "pending": "Pending",
       "noCases": "No recent cases found in the selected timeframe."
-    }
+    },
+    "noTriggeredRules": "No rules triggered yet in this timeframe.",
+    "noRulesConfigured": "No rules configured yet."
   },
   "dashboard": {
     "hero": {
@@ -3122,6 +3145,7 @@
     "focus": {
       "heroTitle": "Patient care, clearly prioritized.",
       "heroDesc": "{{patients}} patients in your clinic. {{pending}} cases need review in {{range}}.",
+      "heroDescOne": "{{patients}} patient in your clinic. {{pending}} cases need review in {{range}}.",
       "attentionSummary": "{{count}} patients require your attention today.",
       "supportingText": "Stay on top of urgent cases and keep your patients on track.",
       "todaySnapshot": "Today's patient snapshot",
@@ -3136,7 +3160,7 @@
       "totalPatientsHint": "In your clinic",
       "needsReview": "Needs review",
       "needsReviewHint": "Awaiting your attention",
-      "urgentPatients": "Urgent patients",
+      "urgentCases": "Urgent cases",
       "urgentPatientsHint": "Awaiting urgent review",
       "reviewNow": "Review now",
       "openQueue": "Open queue",
@@ -3181,11 +3205,12 @@
       "recentActivity": "Recent Activity",
       "viewAll": "View all",
       "activityHighRisk": "Patient marked high risk",
-      "activityPlan": "Treatment plan updated",
+      "activityPlan": "Care recommendations issued",
       "activityCompleted": "Assessment completed",
       "activityNew": "New assessment completed",
       "noRecentActivity": "No recent activity",
-      "highRiskSinceYesterday": "2 patients became high-risk since yesterday",
+      "highRiskSinceYesterday": "{{count}} patient became high-risk since yesterday",
+      "highRiskSinceYesterday_plural": "{{count}} patients became high-risk since yesterday",
       "riskMixShort": "Select a risk group to open matching patients.",
       "activityTrend": "Patient assessment activity",
       "activityTrendDesc": "Real assessment and review volume for the selected reporting window."
@@ -3366,7 +3391,8 @@
       "assess": "Assess",
       "notAssessed": "Not Assessed",
       "noDiagnosisYet": "No diagnosis recorded yet",
-      "callPatient": "Call {{phone}}"
+      "callPatient": "Call {{phone}}",
+      "patients": "patients"
     },
     "conditions": {
       "diabetes": "Likely Diabetes",
@@ -3392,6 +3418,21 @@
       "saving": "Saving...",
       "updatePatient": "Update Patient",
       "createPatient": "Create Patient"
+    },
+    "list": {
+      "noPhone": "No phone on file",
+      "title": "Patients",
+      "filters": "Filters"
+    },
+    "stats": {
+      "total": "Total Patients",
+      "diagnosed": "With Diagnosis",
+      "recent": "Recent (30 days)",
+      "assessed": "Fully Assessed"
+    },
+    "hero": {
+      "title": "Patient Management",
+      "description": "Profiles, symptoms, labs, and diagnosis timelines."
     }
   },
   "historyPage": {
@@ -3436,6 +3477,57 @@
       "by": "By",
       "when": "When",
       "noHistory": "No diagnosis history yet."
+    },
+    "errors": {
+      "loadHistory": "Failed to load patient history",
+      "updateProfile": "Failed to update profile",
+      "addSymptom": "Failed to add symptom",
+      "addLab": "Failed to add lab result"
+    },
+    "visitHistory": {
+      "thisMonth": "This Month",
+      "last3Months": "Last 3 Months",
+      "thisYear": "This Year",
+      "allTime": "All Time",
+      "week": "Week {{n}}",
+      "assessments": "Assessments",
+      "urgent": "Urgent",
+      "heatmapLabel": "Assessments per day, last 90 days",
+      "vsPrevious": "vs previous assessment",
+      "latestCertainty": "Latest assessment certainty"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "diagnoses": "Diagnoses",
+      "symptoms": "Symptoms",
+      "labs": "Lab Results",
+      "profile": "Profile",
+      "nav": "Patient sections"
+    },
+    "header": {
+      "visitHistory": "Visit History"
+    },
+    "medical": {
+      "title": "Medical Record",
+      "lastUpdated": "Last Updated",
+      "weight": "Weight",
+      "height": "Height",
+      "hypertension": "Hypertension",
+      "familyHistory": "Family History"
+    },
+    "overview": {
+      "seeAll": "See all",
+      "none": "No assessments recorded yet.",
+      "viewResult": "View Result"
+    },
+    "sidebar": {
+      "quickStats": "Quick Stats"
+    },
+    "symptoms": {
+      "desc": "Record observed symptoms to enrich future assessments."
+    },
+    "labs": {
+      "desc": "Track glucose and HbA1c measurements over time."
     }
   },
   "reviewPage": {
@@ -3452,7 +3544,8 @@
       "urgent": "URGENT",
       "standard": "Standard",
       "score": "Score",
-      "unknownPatient": "Unknown Patient"
+      "unknownPatient": "Unknown Patient",
+      "loadingFailed": "Failed to load diagnosis review list"
     },
     "details": {
       "noPatientSelected": "No Patient Selected",
@@ -3482,7 +3575,8 @@
       "urgentReasonRequired": "Urgent reason is required when urgent flag is enabled.",
       "submit": "Sign & Submit Review",
       "saving": "Saving Review...",
-      "submitNotice": "Submitting this form will mark the assessment as Reviewed."
+      "submitNotice": "Submitting this form will mark the assessment as Reviewed.",
+      "saveFailed": "Failed to save diagnosis review"
     },
     "viewModes": {
       "byPatient": "By Patient",
@@ -3530,7 +3624,11 @@
       "routine": "Routine findings — maintain healthy diet and annual checkup.",
       "followUp": "Schedule 3-month fasting glucose & HbA1c lab repeat.",
       "urgent": "Immediate endocrinology referral and glycemic monitoring required.",
-      "lifestyle": "Initiate medical nutrition therapy and 150 min/week exercise."
+      "lifestyle": "Initiate medical nutrition therapy and 150 min/week exercise.",
+      "routineLabel": "Routine follow-up",
+      "followUpLabel": "3-month lab repeat",
+      "lifestyleLabel": "Lifestyle plan",
+      "urgentLabel": "Urgent referral"
     },
     "actions": {
       "viewReport": "Official PDF Report",

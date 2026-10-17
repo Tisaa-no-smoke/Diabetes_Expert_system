@@ -1,9 +1,14 @@
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import extract, func
+from sqlalchemy import and_, distinct, extract, func, true
 
 from app.extensions import db
 from app.models.entities import AssessmentSession, DiagnosisResult, Patient, Rule, User
+
+
+def false_condition():
+    """A portable always-false SQL condition for metrics that do not apply."""
+    return true() != true()
 
 
 class DashboardService:
@@ -45,11 +50,16 @@ class DashboardService:
             else None
         )
 
+        # Each metric used to be its own COUNT query. On a remote database every
+        # round-trip costs ~100ms, so diagnosis metrics are gathered in one
+        # conditional-aggregate query and shared by the blocks below.
+        diagnosis_metrics = self._diagnosis_metrics(range_start, range_end, reviewer_user_id, yesterday_start)
+
         # --- KPI cards -------------------------------------------------------
         assessments = self._count_assessments(range_start, range_end, now, yesterday_start, today_start, prev_range_start, window_days)
         active_patients = self._count_patients()
-        urgent_cases = self._count_urgent()
-        treatment_plans = self._count_treatments(range_start, range_end)
+        urgent_cases = self._count_urgent(diagnosis_metrics)
+        treatment_plans = self._count_treatments(diagnosis_metrics)
 
         # --- Recent cases table ----------------------------------------------
         recent_cases = self._recent_cases(range_start, range_end)
@@ -61,10 +71,10 @@ class DashboardService:
         monthly_trend = self._throughput_trend(range_start, range_end, window_days, now)
 
         # --- Rules analytics ------------------------------------------------
-        rules_analytics = self._rules_analytics(range_start, range_end)
+        rules_analytics = self._rules_analytics(range_start, range_end, diagnosis_metrics)
 
         # --- Signed-in clinician workload ------------------------------------
-        doctor_workload = self._doctor_workload(range_start, range_end, reviewer_user_id)
+        doctor_workload = self._doctor_workload(diagnosis_metrics)
 
         return {
             "assessments": assessments,
@@ -76,6 +86,9 @@ class DashboardService:
             "monthly_trend": monthly_trend,
             "rules_analytics": rules_analytics,
             "doctor_workload": doctor_workload,
+            # Distinct patients with an urgent assessment created since the
+            # start of yesterday (always global, like ``urgent_cases``).
+            "new_urgent_patients": diagnosis_metrics["new_urgent_patients"],
             "range": {
                 "days": days if days and days > 0 else None,
                 "start": range_start.isoformat() if range_start else None,
@@ -127,30 +140,27 @@ class DashboardService:
     @staticmethod
     def _count_assessments(range_start, range_end, now, yesterday_start, today_start, prev_range_start, days):
         """Build assessments KPI with trend text."""
-        q = db.session.query(func.count(AssessmentSession.id))
-        today_count = (
-            db.session.query(func.count(AssessmentSession.id))
-            .filter(AssessmentSession.created_at >= today_start)
-            .scalar()
-            or 0
-        )
+        created = AssessmentSession.created_at
+        scope = []
         if range_start:
-            scoped = q.filter(AssessmentSession.created_at >= range_start)
-            if range_end:
-                scoped = scoped.filter(AssessmentSession.created_at <= range_end)
-            count = scoped.scalar() or 0
+            scope.append(created >= range_start)
+        if range_end:
+            scope.append(created <= range_end)
+        previous = (
+            [created >= prev_range_start, created < range_start]
+            if range_start and prev_range_start
+            else [false_condition()]
+        )
+        row = db.session.query(
+            func.count(AssessmentSession.id).filter(and_(true(), *scope)),
+            func.count(AssessmentSession.id).filter(created >= today_start),
+            func.count(AssessmentSession.id).filter(and_(true(), *previous)),
+        ).one()
+        count, today_count, prev_count = (int(value or 0) for value in row)
+        if range_start:
             # compare to the same-length previous window
-            prev_count = 0
-            if prev_range_start:
-                prev_count = q.filter(
-                    AssessmentSession.created_at >= prev_range_start,
-                    AssessmentSession.created_at < range_start,
-                ).scalar() or 0
             trend = DashboardService._trend_text(count, prev_count, f"prev {days}d")
         else:
-            if range_end:
-                q = q.filter(AssessmentSession.created_at <= range_end)
-            count = q.scalar() or 0
             if today_count > 0:
                 trend = f"+{today_count} today"
             else:
@@ -164,65 +174,76 @@ class DashboardService:
         return {"value": total, "trend": "Total registered"}
 
     @staticmethod
-    def _count_urgent():
-        count = (
-            db.session.query(func.count(DiagnosisResult.id))
-            .filter(
-                DiagnosisResult.is_urgent == True,  # noqa: E712
-                DiagnosisResult.reviewed_at.is_(None),
-            )
-            .scalar()
-            or 0
+    def _diagnosis_metrics(range_start, range_end, reviewer_user_id, yesterday_start) -> dict:
+        """Gather every diagnosis count/average the dashboard needs in one query.
+
+        ``pending`` / ``urgent_pending`` are keyed on *creation* date (what
+        landed in the window and still needs a signature), while
+        ``reviewed_by_me`` is keyed on the *review* date so sign-offs performed
+        inside the window are counted even for older assessments. ``urgent``
+        is always global.
+        """
+        def window(column):
+            conditions = []
+            if range_start:
+                conditions.append(column >= range_start)
+            if range_end:
+                conditions.append(column <= range_end)
+            return conditions
+
+        def counted(*conditions):
+            return func.count(DiagnosisResult.id).filter(and_(true(), *conditions))
+
+        unreviewed = DiagnosisResult.reviewed_at.is_(None)
+        urgent = DiagnosisResult.is_urgent == True  # noqa: E712
+        created = window(DiagnosisResult.created_at)
+        mine_reviewed = (
+            [DiagnosisResult.reviewed_by_user_id == reviewer_user_id, *window(DiagnosisResult.reviewed_at)]
+            if reviewer_user_id
+            else [false_condition()]
         )
-        return {"value": count, "trend": "Awaiting review"}
+        mine_assessed = (
+            [DiagnosisResult.diagnosed_by_user_id == reviewer_user_id, *created]
+            if reviewer_user_id
+            else [false_condition()]
+        )
+
+        row = db.session.query(
+            counted(urgent, unreviewed).label("urgent"),
+            counted(unreviewed, *created).label("pending"),
+            counted(unreviewed, urgent, *created).label("urgent_pending"),
+            counted(*mine_reviewed).label("reviewed_by_me"),
+            counted(*mine_assessed).label("assessed_by_me"),
+            counted(
+                DiagnosisResult.recommendation.isnot(None),
+                DiagnosisResult.recommendation != "",
+                *created,
+            ).label("treatments"),
+            counted(*created).label("total"),
+            func.avg(DiagnosisResult.certainty).filter(and_(true(), *created)).label("avg_certainty"),
+            func.count(distinct(DiagnosisResult.patient_id)).filter(
+                and_(urgent, DiagnosisResult.created_at >= yesterday_start)
+            ).label("new_urgent_patients"),
+        ).one()
+
+        metrics = {key: int(getattr(row, key) or 0) for key in (
+            "urgent", "pending", "urgent_pending", "reviewed_by_me", "assessed_by_me", "treatments", "total",
+            "new_urgent_patients",
+        )}
+        metrics["avg_certainty"] = float(row.avg_certainty or 0.0)
+        return metrics
 
     @staticmethod
-    def _doctor_workload(range_start, range_end, reviewer_user_id):
-        """Personal queue metrics for the signed-in clinician.
+    def _count_urgent(metrics):
+        return {"value": metrics["urgent"], "trend": "Awaiting review"}
 
-        ``pending_reviews`` / ``urgent_pending`` are keyed on *creation* date
-        (what landed in the window and still needs a signature), while
-        ``reviewed_by_me`` is keyed on the *review* date so sign-offs performed
-        inside the window are counted even for older assessments.
-        """
-        def scoped(query, column):
-            if range_start:
-                query = query.filter(column >= range_start)
-            if range_end:
-                query = query.filter(column <= range_end)
-            return query
-
-        pending = scoped(
-            db.session.query(func.count(DiagnosisResult.id)).filter(
-                DiagnosisResult.reviewed_at.is_(None)
-            ),
-            DiagnosisResult.created_at,
-        ).scalar() or 0
-
-        urgent_pending = scoped(
-            db.session.query(func.count(DiagnosisResult.id)).filter(
-                DiagnosisResult.reviewed_at.is_(None),
-                DiagnosisResult.is_urgent == True,  # noqa: E712
-            ),
-            DiagnosisResult.created_at,
-        ).scalar() or 0
-
-        reviewed_by_me = 0
-        assessed_by_me = 0
-        if reviewer_user_id:
-            reviewed_by_me = scoped(
-                db.session.query(func.count(DiagnosisResult.id)).filter(
-                    DiagnosisResult.reviewed_by_user_id == reviewer_user_id
-                ),
-                DiagnosisResult.reviewed_at,
-            ).scalar() or 0
-
-            assessed_by_me = scoped(
-                db.session.query(func.count(DiagnosisResult.id)).filter(
-                    DiagnosisResult.diagnosed_by_user_id == reviewer_user_id
-                ),
-                DiagnosisResult.created_at,
-            ).scalar() or 0
+    @staticmethod
+    def _doctor_workload(metrics):
+        """Personal queue metrics for the signed-in clinician."""
+        pending = metrics["pending"]
+        urgent_pending = metrics["urgent_pending"]
+        reviewed_by_me = metrics["reviewed_by_me"]
+        assessed_by_me = metrics["assessed_by_me"]
 
         closed = int(reviewed_by_me) + int(pending)
         signoff_share = round((int(reviewed_by_me) / closed) * 100) if closed else 0
@@ -236,17 +257,8 @@ class DashboardService:
         }
 
     @staticmethod
-    def _count_treatments(range_start, range_end=None):
-        q = db.session.query(func.count(DiagnosisResult.id)).filter(
-            DiagnosisResult.recommendation.isnot(None),
-            DiagnosisResult.recommendation != "",
-        )
-        if range_start:
-            q = q.filter(DiagnosisResult.created_at >= range_start)
-        if range_end:
-            q = q.filter(DiagnosisResult.created_at <= range_end)
-        count = q.scalar() or 0
-        return {"value": count, "trend": "Recommendations issued"}
+    def _count_treatments(metrics):
+        return {"value": metrics["treatments"], "trend": "Recommendations issued"}
 
     @staticmethod
     def _recent_cases(range_start, range_end=None, limit: int = 10):
@@ -444,20 +456,20 @@ class DashboardService:
         return f"{sign}{pct}% from {label}"
 
     @staticmethod
-    def _rules_analytics(range_start, range_end=None):
-        total_rules = db.session.query(func.count(Rule.id)).scalar() or 0
-        active_rules = (
-            db.session.query(func.count(Rule.id))
-            .filter(Rule.status == "active")
-            .scalar()
-            or 0
-        )
-
-        cat_counts = (
-            db.session.query(Rule.category, func.count(Rule.id))
+    def _rules_analytics(range_start, range_end, metrics):
+        # One grouped query yields per-category totals and active counts.
+        rule_rows = (
+            db.session.query(
+                Rule.category,
+                func.count(Rule.id),
+                func.count(Rule.id).filter(Rule.status == "active"),
+            )
             .group_by(Rule.category)
             .all()
         )
+        total_rules = sum(int(total or 0) for _, total, _ in rule_rows)
+        active_rules = sum(int(active or 0) for _, _, active in rule_rows)
+        cat_counts = [(category, total) for category, total, _ in rule_rows]
         cat_colors = {
             "diagnosis": "#f43f5e",
             "triage": "#f59e0b",
@@ -473,17 +485,7 @@ class DashboardService:
             for cat, count in cat_counts
         ]
 
-        # Aggregate count and average accuracy directly in database
-        agg_query = db.session.query(
-            func.count(DiagnosisResult.id),
-            func.coalesce(func.avg(DiagnosisResult.certainty), 0.0),
-        )
-        if range_start:
-            agg_query = agg_query.filter(DiagnosisResult.created_at >= range_start)
-        if range_end:
-            agg_query = agg_query.filter(DiagnosisResult.created_at <= range_end)
-        total_diag_count, db_avg_cert = agg_query.first() or (0, 0.0)
-        avg_accuracy = round(float(db_avg_cert) * 100, 1)
+        avg_accuracy = round(metrics["avg_certainty"] * 100, 1)
 
         # Project only triggered_rules_json and certainty from recent diagnoses (avoiding full ORM model overhead)
         q = db.session.query(

@@ -14,6 +14,7 @@ import {
   Scale,
   Stethoscope,
   Thermometer,
+  TrendingDown,
   TrendingUp,
   UserCog,
   Weight,
@@ -29,6 +30,7 @@ import {
 } from 'recharts'
 import api, { getApiData, getApiErrorMessage } from '../api/client'
 import { formatDateTime } from '@/lib/datetime'
+import { getLocaleForLanguage } from '@/lib/i18n'
 import { AppSelect, Sparkline, StatusBadge, UserAvatar, Skeleton, StatCardsSkeleton, CardListSkeleton } from '@/components/ui'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -49,13 +51,75 @@ const EMPTY_LAB_FORM = {
   notes: '',
 }
 
-const HEATMAP_MATRIX = [
-  [0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0],
-  [2, 0, 0, 0, 0, 0, 2, 2, 3, 0, 3, 3, 0, 0, 0, 0, 3, 3],
-  [1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  [1, 2, 3, 0, 0, 0, 0, 2, 3, 0, 0, 3, 1, 1, 1, 1, 1, 1],
-  [0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2],
-]
+const HEATMAP_DAYS = 90
+const DAY_MS = 24 * 3600 * 1000
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function parseDate(value) {
+  const date = value ? new Date(value) : null
+  return date && !Number.isNaN(date.getTime()) ? date : null
+}
+
+/** Real assessment dates, newest first, with the urgent flag kept. */
+function assessmentEvents(diagnoses = []) {
+  return (diagnoses || [])
+    .map((item) => ({ date: parseDate(item?.created_at), urgent: Boolean(item?.is_urgent) }))
+    .filter((item) => item.date)
+}
+
+function rangeStart(range, now) {
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1)
+  if (range === 'quarter') return new Date(now.getFullYear(), now.getMonth() - 2, 1)
+  if (range === 'year') return new Date(now.getFullYear(), 0, 1)
+  return null
+}
+
+/** One cell per day for the last HEATMAP_DAYS days, oldest first. */
+function activityHeatmap(events, now) {
+  const today = startOfDay(now).getTime()
+  const counts = new Array(HEATMAP_DAYS).fill(0)
+  for (const { date } of events) {
+    const index = HEATMAP_DAYS - 1 - Math.round((today - startOfDay(date).getTime()) / DAY_MS)
+    if (index >= 0 && index < HEATMAP_DAYS) counts[index] += 1
+  }
+  return counts.map((count, index) => ({
+    date: new Date(today - (HEATMAP_DAYS - 1 - index) * DAY_MS),
+    count,
+    level: Math.min(count, 3),
+  }))
+}
+
+/** Assessment and urgent counts bucketed for the selected trend range. */
+function assessmentTrend(events, range, now, language) {
+  const monthLabel = (date) => date.toLocaleDateString(getLocaleForLanguage(language), { month: 'short' })
+  let buckets
+  if (range === 'month') {
+    const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    buckets = Array.from({ length: Math.ceil(days / 7) }, (_, week) => ({
+      week: week + 1,
+      start: new Date(now.getFullYear(), now.getMonth(), week * 7 + 1),
+      end: new Date(now.getFullYear(), now.getMonth(), Math.min(days, week * 7 + 7) + 1),
+    }))
+  } else {
+    const months = range === 'quarter' ? 3 : 12
+    const first = range === 'quarter' ? now.getMonth() - 2 : 0
+    buckets = Array.from({ length: months }, (_, offset) => {
+      const start = new Date(now.getFullYear(), first + offset, 1)
+      return { label: monthLabel(start), start, end: new Date(start.getFullYear(), start.getMonth() + 1, 1) }
+    })
+  }
+  return buckets.map((bucket) => {
+    const inBucket = events.filter(({ date }) => date >= bucket.start && date < bucket.end)
+    return {
+      ...bucket,
+      assessments: inBucket.length,
+      urgent: inBucket.filter((item) => item.urgent).length,
+    }
+  })
+}
 
 function certaintyPercent(value) {
   const num = Number(value)
@@ -87,7 +151,7 @@ function cumulativeSeries(items = [], dateKey) {
 }
 
 export function PatientHistoryPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { user } = useAuth()
   const permissions = new Set(user?.permissions || [])
   const { patientId } = useParams()
@@ -107,9 +171,9 @@ export function PatientHistoryPage() {
   const [savingSymptom, setSavingSymptom] = useState(false)
   const [savingLab, setSavingLab] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
-  const [topTimeRange, setTopTimeRange] = useState('This Year')
+  const [topTimeRange, setTopTimeRange] = useState('year')
   const [showTopRangeMenu, setShowTopRangeMenu] = useState(false)
-  const [timeRange, setTimeRange] = useState('This Month')
+  const [timeRange, setTimeRange] = useState('month')
   const [showRangeMenu, setShowRangeMenu] = useState(false)
 
   async function loadHistory() {
@@ -235,56 +299,43 @@ export function PatientHistoryPage() {
     } catch { return patient.date_of_birth }
   }, [patient?.date_of_birth])
 
-  const visitHistoryData = useMemo(() => {
-    if (timeRange === 'Last 3 Months') {
-      return [
-        { date: 'Apr', newVisits: 45, returningVisits: 60 },
-        { date: 'May', newVisits: 90, returningVisits: 85 },
-        { date: 'Jun', newVisits: 118, returningVisits: 95 },
-      ]
-    }
-    if (timeRange === 'This Year') {
-      return [
-        { date: 'Q1', newVisits: 120, returningVisits: 180 },
-        { date: 'Q2', newVisits: 210, returningVisits: 240 },
-        { date: 'Q3', newVisits: 195, returningVisits: 260 },
-        { date: 'Q4', newVisits: 280, returningVisits: 310 },
-      ]
-    }
-    return [
-      { date: '1 Jun', newVisits: 35, returningVisits: 48 },
-      { date: '7 Jun', newVisits: 82, returningVisits: 104 },
-      { date: '15 Jun', newVisits: 84, returningVisits: 46 },
-      { date: '21 Jun', newVisits: 42, returningVisits: 108 },
-      { date: '30 Jun', newVisits: 118, returningVisits: 88 },
-    ]
-  }, [timeRange])
+  const rangeLabels = {
+    month: t('historyPage.visitHistory.thisMonth', 'This Month'),
+    quarter: t('historyPage.visitHistory.last3Months', 'Last 3 Months'),
+    year: t('historyPage.visitHistory.thisYear', 'This Year'),
+    all: t('historyPage.visitHistory.allTime', 'All Time'),
+  }
 
-  const displayPercent = useMemo(() => {
-    if (latestCertainty != null) {
-      return `${latestCertainty}%`
-    }
-    return '45.09%'
-  }, [latestCertainty])
+  const events = useMemo(() => assessmentEvents(history?.diagnosis_history), [history])
 
-  const trendValue = useMemo(() => {
-    if (history?.diagnosis_history?.length >= 2) {
-      const c1 = certaintyPercent(history.diagnosis_history[0]?.certainty) || 0
-      const c2 = certaintyPercent(history.diagnosis_history[1]?.certainty) || 0
-      const diff = c1 - c2
-      return `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%`
-    }
-    return '10.56%'
+  const rangeEvents = useMemo(() => {
+    const start = rangeStart(topTimeRange, new Date())
+    return start ? events.filter(({ date }) => date >= start) : events
+  }, [events, topTimeRange])
+  const assessmentsInRange = rangeEvents.length
+  const urgentInRange = rangeEvents.filter((item) => item.urgent).length
+
+  const heatmapCells = useMemo(() => activityHeatmap(events, new Date()), [events])
+
+  const visitHistoryData = useMemo(
+    () => assessmentTrend(events, timeRange, new Date(), language).map((bucket) => ({
+      ...bucket,
+      date: bucket.week ? t('historyPage.visitHistory.week', 'Week {{n}}', { n: bucket.week }) : bucket.label,
+    })),
+    [events, timeRange, language, t],
+  )
+
+  const displayPercent = latestCertainty != null ? `${latestCertainty}%` : '—'
+
+  // Change in certainty between the two most recent assessments.
+  const certaintyChange = useMemo(() => {
+    const items = history?.diagnosis_history || []
+    if (items.length < 2) return null
+    const latest = certaintyPercent(items[0]?.certainty)
+    const previous = certaintyPercent(items[1]?.certainty)
+    if (latest == null || previous == null) return null
+    return latest - previous
   }, [history])
-
-  const medicalCheckupCount = useMemo(() => {
-    if (diagnosisCount > 0) return 176 + (diagnosisCount - 1) * 6
-    return 176
-  }, [diagnosisCount])
-
-  const emergencyCount = useMemo(() => {
-    return 64
-  }, [])
 
   const tabs = [
     { key: 'overview', icon: LayoutDashboard, label: t('historyPage.tabs.overview', 'Overview'), count: null },
@@ -404,12 +455,12 @@ export function PatientHistoryPage() {
                 onClick={() => setShowTopRangeMenu((prev) => !prev)}
                 className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
               >
-                <span>{topTimeRange}</span>
+                <span>{rangeLabels[topTimeRange]}</span>
                 <ChevronDown className="h-3 w-3 text-slate-400" />
               </button>
               {showTopRangeMenu && (
                 <div className="absolute right-0 z-20 mt-1 w-32 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800 text-xs">
-                  {['This Year', 'This Month', 'All Time'].map((range) => (
+                  {['year', 'month', 'all'].map((range) => (
                     <button
                       key={range}
                       type="button"
@@ -421,7 +472,7 @@ export function PatientHistoryPage() {
                         topTimeRange === range ? 'font-semibold text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {range}
+                      {rangeLabels[range]}
                     </button>
                   ))}
                 </div>
@@ -433,41 +484,44 @@ export function PatientHistoryPage() {
             <div className="flex items-end gap-5 sm:gap-6 shrink-0">
               <div>
                 <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#4f46e5] dark:text-indigo-400 leading-none">
-                  {medicalCheckupCount}
+                  {assessmentsInRange}
                 </p>
                 <p className="mt-1 text-[11px] sm:text-xs font-normal text-slate-400 dark:text-slate-500">
-                  {t('historyPage.visitHistory.checkup', 'Medical Checkup')}
+                  {t('historyPage.visitHistory.assessments', 'Assessments')}
                 </p>
               </div>
               <div>
                 <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#f43f5e] dark:text-rose-400 leading-none">
-                  {emergencyCount}
+                  {urgentInRange}
                 </p>
                 <p className="mt-1 text-[11px] sm:text-xs font-normal text-slate-400 dark:text-slate-500">
-                  {t('historyPage.visitHistory.emergency', 'Emergency')}
+                  {t('historyPage.visitHistory.urgent', 'Urgent')}
                 </p>
               </div>
             </div>
 
             {/* Heatmap Grid */}
             <div className="overflow-x-auto no-scrollbar py-0.5 shrink-0">
-              <div className="grid grid-rows-5 grid-flow-col gap-1 sm:gap-1.5">
-                {HEATMAP_MATRIX.map((row, rIdx) =>
-                  row.map((val, cIdx) => (
-                    <div
-                      key={`${rIdx}-${cIdx}`}
-                      className={`h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-[2px] transition-colors ${
-                        val === 3
-                          ? 'bg-[#4f46e5] dark:bg-indigo-500'
-                          : val === 2
-                            ? 'bg-[#818cf8] dark:bg-indigo-400'
-                            : val === 1
-                              ? 'bg-[#c7d2fe] dark:bg-indigo-800/60'
-                              : 'bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/50 dark:border-slate-700/40'
-                      }`}
-                    />
-                  ))
-                )}
+              <div
+                className="grid grid-rows-5 grid-flow-col gap-1 sm:gap-1.5"
+                role="img"
+                aria-label={t('historyPage.visitHistory.heatmapLabel', 'Assessments per day, last 90 days')}
+              >
+                {heatmapCells.map((cell) => (
+                  <div
+                    key={cell.date.toISOString()}
+                    title={`${cell.date.toLocaleDateString(getLocaleForLanguage(language))}: ${cell.count}`}
+                    className={`h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-[2px] transition-colors ${
+                      cell.level === 3
+                        ? 'bg-[#4f46e5] dark:bg-indigo-500'
+                        : cell.level === 2
+                          ? 'bg-[#818cf8] dark:bg-indigo-400'
+                          : cell.level === 1
+                            ? 'bg-[#c7d2fe] dark:bg-indigo-800/60'
+                            : 'bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/50 dark:border-slate-700/40'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -716,12 +770,12 @@ export function PatientHistoryPage() {
                     onClick={() => setShowRangeMenu((prev) => !prev)}
                     className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
                   >
-                    <span>{timeRange}</span>
+                    <span>{rangeLabels[timeRange]}</span>
                     <ChevronDown className="h-3 w-3 text-slate-400" />
                   </button>
                   {showRangeMenu && (
                     <div className="absolute right-0 z-20 mt-1 w-32 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800 text-xs">
-                      {['This Month', 'Last 3 Months', 'This Year'].map((range) => (
+                      {['month', 'quarter', 'year'].map((range) => (
                         <button
                           key={range}
                           type="button"
@@ -733,7 +787,7 @@ export function PatientHistoryPage() {
                             timeRange === range ? 'font-semibold text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'
                           }`}
                         >
-                          {range}
+                          {rangeLabels[range]}
                         </button>
                       ))}
                     </div>
@@ -746,18 +800,26 @@ export function PatientHistoryPage() {
                   {displayPercent}
                 </p>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    <TrendingUp className="h-3 w-3" />
-                    {trendValue}
-                  </span>
-                  <span className="text-xs text-slate-400 dark:text-slate-500">
-                    {t('historyPage.visitHistory.thanLastMonth', 'Than last month')}
-                  </span>
+                  {certaintyChange != null ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                        {certaintyChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {`${certaintyChange >= 0 ? '+' : ''}${certaintyChange}%`}
+                      </span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500">
+                        {t('historyPage.visitHistory.vsPrevious', 'vs previous assessment')}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                      {t('historyPage.visitHistory.latestCertainty', 'Latest assessment certainty')}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="mt-3 h-36 w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
                   <LineChart data={visitHistoryData} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800/80" />
                     <XAxis
@@ -771,8 +833,8 @@ export function PatientHistoryPage() {
                       tickLine={false}
                       axisLine={false}
                       tick={{ fontSize: 11, fill: '#94a3b8' }}
-                      domain={[0, 150]}
-                      ticks={[0, 30, 60, 90, 120, 150]}
+                      allowDecimals={false}
+                      domain={[0, (max) => Math.max(3, max)]}
                     />
                     <Tooltip
                       content={({ active, payload, label }) => {
@@ -791,8 +853,8 @@ export function PatientHistoryPage() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="newVisits"
-                      name="New"
+                      dataKey="assessments"
+                      name={t('historyPage.visitHistory.assessments', 'Assessments')}
                       stroke="#2563eb"
                       strokeWidth={2.5}
                       dot={false}
@@ -800,8 +862,8 @@ export function PatientHistoryPage() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="returningVisits"
-                      name="Returning"
+                      dataKey="urgent"
+                      name={t('historyPage.visitHistory.urgent', 'Urgent')}
                       stroke="#93c5fd"
                       strokeWidth={2}
                       dot={false}
@@ -814,11 +876,11 @@ export function PatientHistoryPage() {
               <div className="mt-2 flex items-center justify-center gap-5 text-xs text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-sm bg-blue-600" />
-                  <span>{t('historyPage.visitHistory.new', 'New')}</span>
+                  <span>{t('historyPage.visitHistory.assessments', 'Assessments')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-sm bg-sky-300" />
-                  <span>{t('historyPage.visitHistory.returning', 'Returning')}</span>
+                  <span>{t('historyPage.visitHistory.urgent', 'Urgent')}</span>
                 </div>
               </div>
             </section>
