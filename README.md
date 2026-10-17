@@ -252,13 +252,15 @@ flask --app run.py set-password admin@example.com   # prompts, input hidden
 
 ## 🌐 Deploying (Vercel)
 
-`vercel.json` builds the React site as static files and runs the Flask API
-as a Python function (`api/index.py`) in the Mumbai region (`bom1`), next to
-a Supabase database there. Profile photos are stored in the database, so
+`vercel.json` deploys two Vercel services on one domain: `frontend` (the
+React site, with page links falling back to `index.html`) and `backend` (the
+Flask API from `backend/index.py`, receiving `/api/*` and `/health` with the
+original path), in the Mumbai region (`bom1`) next to a Supabase database
+there. Profile photos are stored in the database, so
 nothing depends on the server's disk.
 
-1. In Vercel choose **Add New → Project** and import this repository
-   (branch `tisa`). Keep the root directory as the repository root.
+1. In Vercel choose **Add New → Project**, import this repository (branch
+   `tisa`), and accept the multi-service project it detects.
 2. Add these **Environment Variables** before the first deploy:
    - `DATABASE_URL`: your Supabase **Session pooler** URL
      (`postgresql+psycopg://...:5432/postgres`)

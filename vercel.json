@@ -1,25 +1,28 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "npm --prefix frontend ci",
-  "buildCommand": "VITE_API_BASE_URL=/api npm --prefix frontend run build -- --outDir ../dist --emptyOutDir",
-  "outputDirectory": "dist",
   "regions": ["bom1"],
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{frontend/**,dist/**,docs/**,scratch/**,postman/**,backend/tests/**,backend/instance/**,backend/scratch/**,backend/.venv/**,backend/migrations/**}"
+  "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "flask",
+      "entrypoint": "index.py"
+    },
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite",
+      "buildCommand": "VITE_API_BASE_URL=/api npm run build",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+      "headers": [
+        {
+          "source": "/assets/(.*)",
+          "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+        }
+      ]
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/health", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    }
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/health", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]
 }
