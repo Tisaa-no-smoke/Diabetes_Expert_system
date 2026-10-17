@@ -44,3 +44,21 @@ def test_english_fallback_is_unchanged(client):
         response = _report(client, "en")
     assert response.status_code == 200
     assert response.data.startswith(b"%PDF")
+
+
+def test_symbols_missing_from_report_fonts_are_redrawn():
+    assert reports._with_symbol_font("23.6 kg/m²") == "23.6 kg/m<super>2</super>"
+    wrapped = reports._with_symbol_font("70 - 99 | ≥126 ទឹកនោមផ្អែម")
+    # Drawn in the fallback font and kept apart from the number after it.
+    assert f'<font name="{reports.SYMBOL_FONT_NAME}">≥</font> 126' in wrapped
+    assert reports._with_symbol_font("< 5.7 normal") == "< 5.7 normal"
+    assert reports._ensure_symbol_font()
+
+
+def test_unentered_measurements_and_whole_number_age():
+    rows = reports._extract_metric_rows({"age": 24.0, "bmi": 23.6, "waist_circumference": 0, "weight_kg": ""}, is_km=True)
+    labels = [label for label, _value, _unit in rows]
+    assert "ទំហំចង្កេះ" not in labels  # waist 0 means "not entered"
+    assert len(rows) == 2
+    assert reports._format_age(None, {"age": 24.0}, is_km=True) == "24 ឆ្នាំ"
+    assert reports._format_age(None, {"age": 24.5}) == "24.5 yrs"

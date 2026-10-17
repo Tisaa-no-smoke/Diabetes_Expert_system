@@ -44,6 +44,56 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
+# Characters the report fonts lack (Noto Sans Khmer has none of them and
+# Helvetica has no ≥/≤); they are drawn in ReportLab's bundled Vera font.
+SYMBOL_FONT_NAME = "ReportSymbolFallback"
+SYMBOL_FALLBACK_CHARS = "²≥≤"
+
+
+def _ensure_symbol_font() -> bool:
+    """Register ReportLab's bundled Vera font for symbols, once."""
+    if not REPORTLAB_AVAILABLE:
+        return False
+    if SYMBOL_FONT_NAME in pdfmetrics.getRegisteredFontNames():
+        return True
+    try:
+        import reportlab
+
+        pdfmetrics.registerFont(TTFont(SYMBOL_FONT_NAME, str(Path(reportlab.__file__).parent / "fonts" / "Vera.ttf")))
+        return True
+    except Exception:
+        return False
+
+
+def _with_symbol_font(text: str) -> str:
+    """Draw symbols missing from the report fonts so they stay readable.
+
+    ² becomes a raised "2" in the same font. ≥ and ≤ switch to the fallback
+    font and are kept as their own word: ReportLab shapes text per word, and
+    a font change inside a shaped word misplaces the characters after it.
+    """
+    text = text.replace("²", "<super>2</super>")
+    for char in "≥≤":
+        text = re.sub(
+            re.escape(char) + r"(?=\S)?",
+            lambda m: f'<font name="{SYMBOL_FONT_NAME}">{char}</font>'
+            + ("" if m.end() >= len(m.string) or m.string[m.end()].isspace() else " "),
+            text,
+        )
+    return text
+
+
+if REPORTLAB_AVAILABLE:
+    class _SymbolSafeParagraph(Paragraph):
+        """Paragraph that draws ², ≥ and ≤ in a font that actually has them."""
+
+        def __init__(self, text, *args, **kwargs):
+            if isinstance(text, str) and any(c in text for c in SYMBOL_FALLBACK_CHARS) and _ensure_symbol_font():
+                text = _with_symbol_font(text)
+            super().__init__(text, *args, **kwargs)
+
+    Paragraph = _SymbolSafeParagraph  # every Paragraph built in this module
+
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 FONTS_DIR = STATIC_DIR / "fonts"
 KHMER_FONT_NOTO = FONTS_DIR / "NotoSansKhmer.ttf"
@@ -1078,7 +1128,7 @@ def _format_gender(val: Any, is_km: bool = False) -> str:
 def _format_age(dob: Any, facts: dict, is_km: bool = False) -> str:
     unit = "ឆ្នាំ" if is_km else "yrs"
     if "age" in facts and facts["age"] not in (None, ""):
-        return f"{facts['age']} {unit}"
+        return f"{_format_numeric(facts['age'])} {unit}"
     if isinstance(dob, (date, datetime)):
         today = date.today()
         years = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
@@ -1135,8 +1185,15 @@ def _extract_metric_rows(facts: dict, is_km: bool = False) -> list[tuple[str, An
     rows = []
     for key, label, unit in defs:
         val = facts.get(key)
-        if val not in (None, ""):
-            rows.append((label, val, unit))
+        if val in (None, ""):
+            continue
+        # A body measurement of 0 means "not entered", not a real reading.
+        try:
+            if float(val) <= 0:
+                continue
+        except (TypeError, ValueError):
+            pass
+        rows.append((label, val, unit))
     return rows
 
 
