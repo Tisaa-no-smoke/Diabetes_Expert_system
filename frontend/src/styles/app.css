@@ -1857,3 +1857,32 @@ html.dark .admin-role-card:hover {
     --tw-ring-color: #cbd5e1 !important;
   }
 }
+
+/* ── Patient portal (light mode): a soft tinted canvas so white cards stand
+   out, instead of white cards on a near-white page. Staff screens and dark
+   mode are unchanged. ── */
+html:not(.dark) .app-layout-root[data-portal='patient'] {
+  background-color: #e8f0f8;
+  background-image:
+    radial-gradient(1100px 560px at -5% -10%, rgba(59, 130, 246, 0.16), transparent 60%),
+    radial-gradient(900px 520px at 105% -5%, rgba(20, 184, 166, 0.14), transparent 58%),
+    linear-gradient(180deg, #edf4fb 0%, #e5eef7 100%);
+}
+
+html:not(.dark) .app-layout-root[data-portal='patient'] > aside {
+  border-right-color: #d5e2f0;
+  background: linear-gradient(180deg, #f7fbff 0%, #edf4fb 100%);
+}
+
+html:not(.dark) .app-layout-root[data-portal='patient'] header.sticky {
+  border-bottom-color: #d8e4f1;
+  background-color: rgba(246, 250, 255, 0.8);
+}
+
+/* Page cards: a slightly stronger edge and a soft lift off the tinted page. */
+html:not(.dark) .app-layout-root[data-portal='patient'] main :is(.rounded-2xl, .rounded-3xl, .surface).bg-white {
+  border-color: #d3e0ee;
+  box-shadow:
+    0 1px 2px rgba(15, 40, 80, 0.05),
+    0 14px 32px -22px rgba(15, 52, 96, 0.4);
+}
