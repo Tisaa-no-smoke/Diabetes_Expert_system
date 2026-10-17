@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
@@ -186,6 +187,16 @@ METRIC_DEFINITIONS_KM = (
 )
 
 
+def _khmer_font_is_shapable() -> bool:
+    """True when the registered Khmer font can be shaped (uharfbuzz installed)."""
+    try:
+        from reportlab.pdfbase.pdfmetrics import getFont
+
+        return bool(getattr(getFont("KhmerFont"), "shapable", False))
+    except Exception:
+        return False
+
+
 def render_diagnosis_report_pdf(diagnosis_result, *, lang: str = "en", config: dict[str, Any] | None = None) -> tuple[bytes, str]:
     """Render a publication-quality clinical PDF report. Uses WeasyPrint HTML template when available, with ReportLab fallback."""
     if WEASYPRINT_AVAILABLE and JINJA2_AVAILABLE:
@@ -259,6 +270,13 @@ def render_diagnosis_report_pdf(diagnosis_result, *, lang: str = "en", config: d
     report_title = "របាយការណ៍វិនិច្ឆ័យ និងវាយតម្លៃជំងឺទឹកនោមផ្អែម" if is_km else "Diabetes Clinical Assessment Report"
 
     styles = _build_styles(getSampleStyleSheet, ParagraphStyle, colors, C_NAVY_DARK, C_SLATE_DARK, C_SLATE_MID, font_name, font_bold)
+    # Khmer needs text shaping (vowels and subscript consonants are placed
+    # around the base letter). ReportLab does it with uharfbuzz but only when
+    # asked; without it the letters come out in the wrong positions.
+    khmer_shaping = bool(is_km and has_khmer_font and _khmer_font_is_shapable())
+    if khmer_shaping:
+        for style in styles.byName.values():
+            style.shaping = 1
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -513,20 +531,32 @@ def render_diagnosis_report_pdf(diagnosis_result, *, lang: str = "en", config: d
         canvas_obj.setLineWidth(0.6)
         canvas_obj.line(doc.leftMargin, line_y, page_width - doc.rightMargin, line_y)
 
+        def footer_text(text, x, y, font, size, align="left"):
+            # Canvas text is only shaped when the optional rlbidi package is
+            # installed, but paragraphs are always shaped; use one for Khmer.
+            if not khmer_shaping:
+                canvas_obj.setFont(font, size)
+                draw = {"left": canvas_obj.drawString, "center": canvas_obj.drawCentredString,
+                        "right": canvas_obj.drawRightString}[align]
+                draw(x, y, text)
+                return
+            style = ParagraphStyle(
+                "FooterShaped", fontName=font, fontSize=size, leading=size * 1.2,
+                textColor=C_SLATE_MID, shaping=1,
+                alignment={"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}[align],
+            )
+            box_width = page_width - doc.leftMargin - doc.rightMargin
+            para = Paragraph(_safe_text(text), style)
+            _, height = para.wrapOn(canvas_obj, box_width, size * 3)
+            para.drawOn(canvas_obj, doc.leftMargin, y - height + size)
+
         canvas_obj.setFillColor(C_SLATE_MID)
-        canvas_obj.setFont(font_bold, 7.5)
-        canvas_obj.drawString(doc.leftMargin, footer_y + 3, clinic_name.upper())
-
-        canvas_obj.setFont(font_name, 7)
+        footer_text(clinic_name.upper(), doc.leftMargin, footer_y + 3, font_bold, 7.5)
         footer_sub = "ឯកសារវេជ្ជសាស្ត្រសម្ងាត់" if is_km else "Confidential Clinical Document"
-        canvas_obj.drawString(doc.leftMargin, footer_y - 4, f"{footer_sub} · {clinic_address}")
-
-        canvas_obj.setFont(font_name, 7.5)
-        canvas_obj.drawCentredString(page_width / 2, footer_y + 3, f"Ref: {report_number}")
-
-        canvas_obj.setFont(font_bold, 7.5)
+        footer_text(f"{footer_sub} · {clinic_address}", doc.leftMargin, footer_y - 4, font_name, 7)
+        footer_text(f"Ref: {report_number}", page_width / 2, footer_y + 3, font_name, 7.5, "center")
         page_str = f"ទំព័រ {canvas_obj._pageNumber} នៃ {page_count}" if is_km else f"Page {canvas_obj._pageNumber} of {page_count}"
-        canvas_obj.drawRightString(page_width - doc.rightMargin, footer_y + 3, page_str)
+        footer_text(page_str, page_width - doc.rightMargin, footer_y + 3, font_bold, 7.5, "right")
         canvas_obj.restoreState()
 
     class NumberedCanvas(canvas.Canvas):
