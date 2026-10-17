@@ -250,6 +250,24 @@ flask --app run.py set-password admin@example.com   # prompts, input hidden
 
 ---
 
+## 🌐 Deploying (Render)
+
+The root `Dockerfile` builds the website and the API into one service, and
+`render.yaml` describes it for Render (Singapore region, close to a Supabase
+database in Mumbai).
+
+1. In Render choose **New → Blueprint** and select this repository.
+2. When asked, set `DATABASE_URL` to your Supabase **Session pooler** URL
+   (`postgresql+psycopg://...:5432/postgres`). `SECRET_KEY` is generated.
+3. Leave `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` empty until Google
+   sign-in is set up.
+
+Every start applies database migrations. Demo accounts are never created on
+the server (`SEED_DEMO_DATA=false`). A brand-new database also needs the rule
+set once: `flask --app run.py sync-knowledge-base --version v3`.
+
+---
+
 ## 🧪 Testing and Verification
 
 **Backend tests:**

@@ -1,0 +1,23 @@
+# Keep secrets, local data, and build output out of the image.
+**/.env
+**/.env.*
+!**/.env.example
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+**/node_modules
+**/*.db
+backend/instance
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+dist
+scratch
+backend/scratch
+docs
+postman
+.vscode
+.DS_Store

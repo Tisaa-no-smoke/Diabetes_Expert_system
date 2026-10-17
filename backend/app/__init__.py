@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import click
-from flask import Flask, request
+from flask import Flask, abort, request, send_from_directory
 from flask_cors import CORS
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
@@ -198,6 +198,11 @@ def _ensure_patient_profile_columns():
 def create_app(config_object=Config):
     app = Flask(__name__)
     app.config.from_object(config_object)
+    proxy_count = int(app.config.get("TRUSTED_PROXY_COUNT") or 0)
+    if proxy_count:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_count, x_proto=proxy_count)
     _resolve_startup_database(app)
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         **app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {}), "hide_parameters": True,
@@ -290,9 +295,39 @@ def create_app(config_object=Config):
 
     from flask import redirect, render_template, url_for
 
+    frontend_dist = app.config.get("FRONTEND_DIST_DIR")
+    frontend_dist = Path(frontend_dist).resolve() if frontend_dist else None
+    if frontend_dist and not (frontend_dist / "index.html").is_file():
+        app.logger.warning("FRONTEND_DIST_DIR has no index.html; not serving the website.")
+        frontend_dist = None
+
+    def _serve_app_shell():
+        response = send_from_directory(frontend_dist, "index.html")
+        # The shell names the current hashed bundles, so it must not be cached.
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.get("/")
     def root():
+        if frontend_dist:
+            return _serve_app_shell()
         return redirect(url_for("start"))
+
+    if frontend_dist:
+        @app.get("/<path:path>")
+        def frontend(path):
+            # API routes are matched first; an unknown /api path stays a JSON 404.
+            if path == "api" or path.startswith("api/"):
+                abort(404)
+            candidate = (frontend_dist / path).resolve()
+            if candidate.is_relative_to(frontend_dist) and candidate.is_file():
+                response = send_from_directory(frontend_dist, path)
+                if path.startswith("assets/"):
+                    # Vite fingerprints these file names, so they never change.
+                    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                return response
+            # Client-side routes such as /dashboard load the React app.
+            return _serve_app_shell()
 
     @app.get("/start")
     def start():

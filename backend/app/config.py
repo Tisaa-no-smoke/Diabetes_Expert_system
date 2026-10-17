@@ -103,6 +103,14 @@ class Config:
 
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip() or None
 
+    # Deployment behind a hosting proxy (e.g. Render): how many proxies to
+    # trust for the client address and scheme. 0 locally; 1 on Render. Without
+    # it every visitor shares the proxy's IP and therefore one rate limit.
+    TRUSTED_PROXY_COUNT = max(0, int(os.getenv("TRUSTED_PROXY_COUNT", "0") or 0))
+    # Folder with the built React app (frontend/dist). When set, the API server
+    # also serves the website from the same address.
+    FRONTEND_DIST_DIR = os.getenv("FRONTEND_DIST_DIR", "").strip() or None
+
 
     # Rate limiting
     RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "200 per minute")

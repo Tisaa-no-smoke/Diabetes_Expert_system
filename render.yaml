@@ -1,0 +1,45 @@
+# Render Blueprint: one web service that serves the website and the API.
+# In Render: New → Blueprint → pick this repository. Values marked
+# `sync: false` are asked for once in the Render dashboard and never stored here.
+services:
+  - type: web
+    name: diabetes-expert-system
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Singapore is the closest Render region to the Supabase database (Mumbai).
+    region: singapore
+    plan: free
+    branch: tisa
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      # Render's load balancer is the one proxy in front of the app.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      # Public deployment: never create tables or demo accounts automatically.
+      - key: DB_AUTO_CREATE
+        value: "false"
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: DB_FALLBACK_ENABLED
+        value: "false"
+      - key: RULES_SEED_VERSION
+        value: v3
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: DB_MAX_OVERFLOW
+        value: "2"
+      # Optional until Google sign-in is set up (same value for both).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
