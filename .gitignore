@@ -8,7 +8,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
-!.env.vercel
 
 # Local databases
 *.db
@@ -32,3 +31,6 @@ dist/
 .cursor/
 .agents/
 .mcp.json
+
+# Real deployment secrets — never commit
+.env.vercel
