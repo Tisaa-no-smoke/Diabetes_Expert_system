@@ -18,6 +18,7 @@ import {
 import { useNotifications } from '@/contexts/NotificationContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { formatDateTime, parseApiDateTime } from '@/lib/datetime'
+import { translateExact } from '@/lib/i18n'
 
 function getNotificationTypeIcon(type) {
   switch (type) {
@@ -89,6 +90,24 @@ function formatRelativeTime(dateString, language = 'en') {
   if (diffDays < 7) return language === 'km' ? `${diffDays} ថ្ងៃមុន` : `${diffDays}d ago`
 
   return formatDateTime(dateString, '', language)
+}
+
+/**
+ * Notifications store English text plus a `kind` and `params`; show them in
+ * the reader's language when the kind is known, otherwise the stored text.
+ */
+export function localizeNotification(item, t, language) {
+  const kind = item?.metadata?.kind
+  if (!kind) return { title: item.title, message: item.message }
+  const params = item.metadata.params || {}
+  const values = {
+    ...params,
+    diagnosis: params.diagnosis ? translateExact(language, params.diagnosis) : '',
+  }
+  return {
+    title: t(`notificationPanel.kinds.${kind}.title`, item.title, values),
+    message: t(`notificationPanel.kinds.${kind}.message`, item.message, values),
+  }
 }
 
 export function NotificationDropdown({ className = '' }) {
@@ -275,6 +294,7 @@ export function NotificationDropdown({ className = '' }) {
               </div>
             ) : (
               filteredNotifications.map((item) => {
+                const text = localizeNotification(item, t, language)
                 const TypeIcon = getNotificationTypeIcon(item.type)
                 const typeStyles = getNotificationTypeStyles(item.type)
 
@@ -302,7 +322,7 @@ export function NotificationDropdown({ className = '' }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
                         <p className={`truncate text-xs font-semibold ${!item.is_read ? 'text-slate-900 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {item.title}
+                          {text.title}
                         </p>
                         <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
                           {formatRelativeTime(item.created_at, language)}
@@ -310,7 +330,7 @@ export function NotificationDropdown({ className = '' }) {
                       </div>
 
                       <p className="mt-1 text-xs leading-relaxed text-slate-600 line-clamp-2 dark:text-slate-400">
-                        {item.message}
+                        {text.message}
                       </p>
 
                       <div className="mt-2 flex items-center justify-between gap-2">

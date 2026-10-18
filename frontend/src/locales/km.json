@@ -676,7 +676,25 @@
     "markAsRead": "សម្គាល់ថាបានអាន",
     "delete": "លុបការជូនដំណឹង",
     "today": "ថ្ងៃនេះ",
-    "earlier": "មុននេះ"
+    "earlier": "មុននេះ",
+    "kinds": {
+      "assessment_by_clinician": {
+        "title": "ការវាយតម្លៃថ្មីដោយ {{clinician}}",
+        "message": "{{clinician}} បានបញ្ចប់ការវាយតម្លៃគ្លីនិកសម្រាប់អ្នក ({{diagnosis}})។"
+      },
+      "urgent_case": {
+        "title": "ការជូនដំណឹងបន្ទាន់៖ {{patient}}",
+        "message": "{{patient}} ត្រូវបានវាយតម្លៃថាមានស្ថានភាពធ្ងន់ធ្ងរ៖ {{diagnosis}} (កម្រិតជឿជាក់ {{certainty}}%)។"
+      },
+      "review_requested": {
+        "title": "សំណើឱ្យពិនិត្យ៖ {{patient}}",
+        "message": "{{patient}} បានបញ្ជូនការវាយតម្លៃមកឱ្យវេជ្ជបណ្ឌិតពិនិត្យ ({{diagnosis}})។"
+      },
+      "review_completed": {
+        "title": "វេជ្ជបណ្ឌិតបានពិនិត្យការវាយតម្លៃរបស់អ្នករួចហើយ",
+        "message": "{{clinician}} បានពិនិត្យសេចក្តីសង្ខេបសុខភាពថ្មីៗរបស់អ្នក ({{diagnosis}}) និងបានធ្វើបច្ចុប្បន្នភាពអនុសាសន៍ថែទាំរបស់អ្នក។"
+      }
+    }
   },
   "profileSetup": {
     "stepProgress": "ជំហានទី {{current}} ក្នុងចំណោម {{total}}",

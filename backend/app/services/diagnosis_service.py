@@ -22,6 +22,7 @@ from app.expert_system.patient_messaging import (
     rewrite_recommendation_bilingual,
 )
 from app.models.entities import utc_now
+from app.services.notification_service import clinical_reviewer_ids, notify
 from app.services.diagnosis_report_service import render_diagnosis_report_pdf, render_khmer_report_weasyprint
 from app.utils.i18n import SUPPORTED_LANGUAGES, bilingual, join_bilingual, pick, text
 
@@ -150,55 +151,15 @@ class DiagnosisService:
             )
 
         if save_to_db and diagnosis_record:
-            try:
-                from app.dependencies import get_notification_repository
-                from app.models import Role
-                notif_repo = get_notification_repository()
-                patient_name = diagnosis_record.patient.full_name if diagnosis_record.patient else f"Patient #{patient_id}"
-
-                # 1. If Clinician performed this assessment, automatically alert the patient
-                if is_clinician and diagnosis_record.patient and diagnosis_record.patient.user_id:
-                    patient_user_id = diagnosis_record.patient.user_id
-                    if patient_user_id != user_id:
-                        doc_user = diagnosis_record.diagnosed_by_user
-                        doctor_name = doc_user.name if doc_user else (current_user.get("name") or "Your clinician")
-                        notif_repo.create(
-                            user_id=patient_user_id,
-                            title=f"New Assessment by Dr. {doctor_name}",
-                            message=f"Dr. {doctor_name} has completed a clinical assessment for you ({result['diagnosis']}).",
-                            type="diagnosis",
-                            link=f"/diagnosis/result?diagnosis_result_id={diagnosis_record.id}",
-                            metadata={"diagnosis_id": diagnosis_record.id, "patient_id": patient_id},
-                        )
-
-                # 2. Urgent triage alerts to doctors
-                if is_urgent:
-                    doctor_role = Role.query.filter_by(name="doctor").first()
-                    clinician_users = set(doctor_role.users if doctor_role else [])
-                    for cl_user in clinician_users:
-                        notif_repo.create(
-                            user_id=cl_user.id,
-                            title=f"Urgent Triage Alert: {patient_name}",
-                            message=f"{patient_name} assessed with acute condition: {result['diagnosis']} ({round(result['certainty'] * 100)}% certainty).",
-                            type="urgent",
-                            link="/review",
-                            metadata={"diagnosis_id": diagnosis_record.id, "patient_id": patient_id},
-                        )
-                # 3. Patient explicitly submitted assessment to doctors
-                elif not is_clinician and submitted_to_care_team:
-                    doctor_role = Role.query.filter_by(name="doctor").first()
-                    clinician_users = set(doctor_role.users if doctor_role else [])
-                    for cl_user in clinician_users:
-                        notif_repo.create(
-                            user_id=cl_user.id,
-                            title=f"Review Requested: {patient_name}",
-                            message=f"{patient_name} submitted an assessment for doctor review ({result['diagnosis']}).",
-                            type="diagnosis",
-                            link="/review",
-                            metadata={"diagnosis_id": diagnosis_record.id, "patient_id": patient_id},
-                        )
-            except Exception:
-                pass
+            self._send_assessment_notifications(
+                diagnosis_record,
+                result,
+                actor_user_id=user_id,
+                actor_name=current_user.get("name"),
+                is_clinician=is_clinician,
+                is_urgent=is_urgent,
+                submitted_to_care_team=submitted_to_care_team,
+            )
 
         response = dict(result)
         response["diagnosis_result_id"] = diagnosis_record.id if diagnosis_record else None
@@ -255,26 +216,7 @@ class DiagnosisService:
                     },
                 )
 
-            # Alert doctors about the submitted assessment
-            try:
-                from app.dependencies import get_notification_repository
-                from app.models import Role
-                notif_repo = get_notification_repository()
-                patient_name = result.patient.full_name if result.patient else f"Patient #{result.patient_id}"
-
-                doctor_role = Role.query.filter_by(name="doctor").first()
-                clinician_users = set(doctor_role.users if doctor_role else [])
-                for cl_user in clinician_users:
-                    notif_repo.create(
-                        user_id=cl_user.id,
-                        title=f"Review Requested: {patient_name}",
-                        message=f"{patient_name} submitted an assessment for doctor review ({result.diagnosis}).",
-                        type="diagnosis",
-                        link="/review",
-                        metadata={"diagnosis_id": result.id, "patient_id": result.patient_id},
-                    )
-            except Exception:
-                pass
+            self._notify_review_requested(result, actor_user_id=user_id)
 
             serialized = self.diagnosis_repository.serialize_result(result)
             return self._rebuild_persisted_response(serialized)
@@ -571,21 +513,74 @@ class DiagnosisService:
                 },
             )
 
-        if updated.patient and updated.patient.user_id:
-            try:
-                from app.dependencies import get_notification_repository
-                get_notification_repository().create(
-                    user_id=updated.patient.user_id,
-                    title="Doctor Completed Assessment Review",
-                    message=f"{current_user.get('name') or 'Your clinician'} reviewed your recent health summary ({updated.diagnosis}) and updated your care recommendations.",
-                    type="review",
-                    link="/my-results",
-                    metadata={"diagnosis_id": updated.id, "diagnosis": updated.diagnosis},
-                )
-            except Exception:
-                pass
+        if updated.patient and updated.patient.user_id and updated.patient.user_id != reviewer_user_id:
+            clinician = current_user.get("name") or "Your clinician"
+            notify(
+                [updated.patient.user_id],
+                kind="review_completed",
+                title="Doctor completed your assessment review",
+                message=f"{clinician} reviewed your recent health summary ({updated.diagnosis}) and updated your care recommendations.",
+                type="review",
+                link=f"/diagnosis/result?diagnosis_result_id={updated.id}",
+                params={"clinician": clinician, "diagnosis": updated.diagnosis},
+                metadata={"diagnosis_id": updated.id, "patient_id": updated.patient_id},
+            )
 
         return self.diagnosis_repository.serialize_result(updated)
+
+    @staticmethod
+    def _patient_name(record) -> str:
+        return record.patient.full_name if record.patient else f"Patient #{record.patient_id}"
+
+    def _send_assessment_notifications(
+        self, record, result: dict, *, actor_user_id, actor_name, is_clinician, is_urgent, submitted_to_care_team
+    ) -> None:
+        diagnosis = result["diagnosis"]
+        meta = {"diagnosis_id": record.id, "patient_id": record.patient_id}
+
+        # A clinician assessed a patient who has an account: tell the patient.
+        patient_user_id = record.patient.user_id if record.patient else None
+        if is_clinician and patient_user_id and patient_user_id != actor_user_id:
+            clinician = (record.diagnosed_by_user.name if record.diagnosed_by_user else None) or actor_name or "Your clinician"
+            notify(
+                [patient_user_id],
+                kind="assessment_by_clinician",
+                title=f"New assessment by {clinician}",
+                message=f"{clinician} completed a clinical assessment for you ({diagnosis}).",
+                type="diagnosis",
+                link=f"/diagnosis/result?diagnosis_result_id={record.id}",
+                params={"clinician": clinician, "diagnosis": diagnosis},
+                metadata=meta,
+            )
+
+        patient = self._patient_name(record)
+        if is_urgent:
+            certainty = round(float(result.get("certainty") or 0) * 100)
+            notify(
+                clinical_reviewer_ids(exclude_user_id=actor_user_id),
+                kind="urgent_case",
+                title=f"Urgent triage alert: {patient}",
+                message=f"{patient} was assessed with an acute condition: {diagnosis} ({certainty}% certainty).",
+                type="urgent",
+                link=f"/review?diagnosis_result_id={record.id}",
+                params={"patient": patient, "diagnosis": diagnosis, "certainty": certainty},
+                metadata=meta,
+            )
+        elif not is_clinician and submitted_to_care_team:
+            self._notify_review_requested(record, actor_user_id=actor_user_id)
+
+    def _notify_review_requested(self, record, *, actor_user_id) -> None:
+        patient = self._patient_name(record)
+        notify(
+            clinical_reviewer_ids(exclude_user_id=actor_user_id),
+            kind="review_requested",
+            title=f"Review requested: {patient}",
+            message=f"{patient} submitted an assessment for doctor review ({record.diagnosis}).",
+            type="diagnosis",
+            link=f"/review?diagnosis_result_id={record.id}",
+            params={"patient": patient, "diagnosis": record.diagnosis},
+            metadata={"diagnosis_id": record.id, "patient_id": record.patient_id},
+        )
 
     def _resolve_patient_id(self, payload: dict, current_user: dict, user_permissions: set[str]) -> int:
         has_own_patient_scope = "patient.view_own" in user_permissions

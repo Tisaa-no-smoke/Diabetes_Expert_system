@@ -676,7 +676,25 @@
     "markAsRead": "Mark as read",
     "delete": "Delete notification",
     "today": "Today",
-    "earlier": "Earlier"
+    "earlier": "Earlier",
+    "kinds": {
+      "assessment_by_clinician": {
+        "title": "New assessment by {{clinician}}",
+        "message": "{{clinician}} completed a clinical assessment for you ({{diagnosis}})."
+      },
+      "urgent_case": {
+        "title": "Urgent triage alert: {{patient}}",
+        "message": "{{patient}} was assessed with an acute condition: {{diagnosis}} ({{certainty}}% certainty)."
+      },
+      "review_requested": {
+        "title": "Review requested: {{patient}}",
+        "message": "{{patient}} submitted an assessment for doctor review ({{diagnosis}})."
+      },
+      "review_completed": {
+        "title": "Doctor completed your assessment review",
+        "message": "{{clinician}} reviewed your recent health summary ({{diagnosis}}) and updated your care recommendations."
+      }
+    }
   },
   "profileSetup": {
     "stepProgress": "Step {{current}} of {{total}}",

@@ -6,6 +6,9 @@ const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth()
+  // Depend on the account, not the user object: the signed-in user is
+  // re-fetched every 30 s, and a new object would restart polling each time.
+  const userId = user?.id ?? null
   const canViewNotifications = Boolean(user?.permissions?.includes('notification.view'))
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -13,7 +16,7 @@ export function NotificationProvider({ children }) {
   const [loading, setLoading] = useState(false)
 
   const fetchNotifications = useCallback(async (options = {}) => {
-    if (!user || !canViewNotifications) {
+    if (!userId || !canViewNotifications) {
       setNotifications([])
       setUnreadCount(0)
       setTotalCount(0)
@@ -35,11 +38,11 @@ export function NotificationProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [user, canViewNotifications])
+  }, [userId, canViewNotifications])
 
   // Periodic polling when window is active
   useEffect(() => {
-    if (!user || !canViewNotifications) {
+    if (!userId || !canViewNotifications) {
       fetchNotifications()
       return
     }
@@ -61,7 +64,7 @@ export function NotificationProvider({ children }) {
       clearInterval(interval)
       window.removeEventListener('focus', onFocus)
     }
-  }, [user, canViewNotifications, fetchNotifications])
+  }, [userId, canViewNotifications, fetchNotifications])
 
   const markAsRead = useCallback(async (id) => {
     // Optimistic update
@@ -107,13 +110,15 @@ export function NotificationProvider({ children }) {
   }, [notifications, fetchNotifications])
 
   const clearReadNotifications = useCallback(async () => {
+    const readCount = notifications.filter((n) => n.is_read).length
     setNotifications((prev) => prev.filter((n) => !n.is_read))
+    setTotalCount((prev) => Math.max(0, prev - readCount))
     try {
       await api.delete('/notifications/clear-read')
     } catch {
       fetchNotifications({ silent: true })
     }
-  }, [fetchNotifications])
+  }, [notifications, fetchNotifications])
 
   const value = useMemo(
     () => ({

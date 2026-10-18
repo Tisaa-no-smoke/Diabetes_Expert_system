@@ -529,5 +529,13 @@
   "Rapid Symptom Onset": "រោគសញ្ញាលេចឡើងលឿន (ពីរបីថ្ងៃទៅសប្តាហ៍)",
   "Burning Sensation In Extremities": "អារម្មណ៍ក្តៅក្រហាយនៅចុងដៃចុងជើង",
   "Numbness In Extremities": "ស្ពឹកស្រពន់នៅចុងដៃចុងជើង",
-  "Tingling In Hands/Feet": "ស្ពឹកស្រពន់ ឬចាក់ស្រៀបៗនៅដៃជើង"
+  "Tingling In Hands/Feet": "ស្ពឹកស្រពន់ ឬចាក់ស្រៀបៗនៅដៃជើង",
+  "Diabetes Mellitus (Confirmed)": "ជំងឺទឹកនោមផ្អែម (បានបញ្ជាក់)",
+  "Likely Diabetes Mellitus": "ទំនងជាជំងឺទឹកនោមផ្អែម",
+  "Prediabetes (Impaired Glucose Regulation)": "មុនទឹកនោមផ្អែម (ការថយចុះសមត្ថភាពគ្រប់គ្រងជាតិស្ករ)",
+  "Elevated Type 2 Diabetes Risk — Preventive Action Recommended": "ហានិភ័យកើនឡើងនៃជំងឺទឹកនោមផ្អែមប្រភេទទី 2 — ណែនាំឱ្យចាត់វិធានការបង្ការ",
+  "Routine Diabetes Screening Recommended": "ណែនាំឱ្យពិនិត្យរកជំងឺទឹកនោមផ្អែមជាប្រចាំ",
+  "Pattern Consistent with Type 1 Diabetes — Urgent Specialist Referral": "លំនាំស្របនឹងជំងឺទឹកនោមផ្អែមប្រភេទទី 1 — បញ្ជូនទៅគ្រូពេទ្យឯកទេសជាបន្ទាន់",
+  "Pattern Consistent with Type 2 Diabetes": "លំនាំស្របនឹងជំងឺទឹកនោមផ្អែមប្រភេទទី 2",
+  "Normal Glucose Regulation — No Diabetes Indication": "ការគ្រប់គ្រងជាតិស្ករធម្មតា — គ្មានសញ្ញាជំងឺទឹកនោមផ្អែម"
 }
